@@ -1,0 +1,45 @@
+# ── Secrets (NEVER commit) ─────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Python ──────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+.Python
+
+# ── Uploads & generated storage ────────────────────────────
+backend/storage/
+backend/data/
+backend/uploads/
+backend/chroma_db/
+backend/archlens.db
+
+# ── Frontend build output ───────────────────────────────────
+frontend/dist/
+frontend/node_modules/
+
+# ── Logs ────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── OS junk ─────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDE ─────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
