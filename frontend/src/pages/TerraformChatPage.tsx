@@ -162,7 +162,7 @@ function getChipColor(service: string) {
    Component
    ══════════════════════════════════════════════════════════════ */
 export const TerraformChatPage = () => {
-  const { jobId, designDocs, selectedProvider } = useWorkflowStore();
+  const { jobId, designDocs, selectedProvider, terraformPrompts } = useWorkflowStore();
   const {
     messages,
     generatedFiles,
@@ -186,6 +186,19 @@ export const TerraformChatPage = () => {
   } = useTerraformChatStore();
 
   const [input, setInput] = useState('');
+
+  /* ── Pick up a pending prompt from DesignDocPage navigation ── */
+  const hasPendingRef = useRef(false);
+  useEffect(() => {
+    if (hasPendingRef.current) return;
+    const pending = (window as any).__pendingTfPrompt;
+    if (pending) {
+      hasPendingRef.current = true;
+      setInput(pending);
+      delete (window as any).__pendingTfPrompt;
+      setTimeout(() => textareaRef.current?.focus(), 100);
+    }
+  });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
@@ -626,44 +639,130 @@ export const TerraformChatPage = () => {
                 </div>
               </div>
 
-              {/* Quick start chips */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', maxWidth: '500px' }}>
-                {diagramContext && diagramContext.detectedResources.length > 0 && (
-                  <button
-                    onClick={() => handleQuickStart('From my diagram ↑')}
-                    style={{
-                      padding: '6px 14px',
-                      borderRadius: '20px',
-                      border: '0.5px solid rgba(0,0,0,0.12)',
-                      background: 'white',
-                      fontSize: '12px',
-                      color: '#1a1a1a',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    From my diagram ↑
-                  </button>
-                )}
-                {QUICK_STARTS.map((q) => (
-                  <button
-                    key={q}
-                    onClick={() => handleQuickStart(q)}
-                    style={{
-                      padding: '6px 14px',
-                      borderRadius: '20px',
-                      border: '0.5px solid rgba(0,0,0,0.12)',
-                      background: 'white',
-                      fontSize: '12px',
-                      color: '#1a1a1a',
-                      cursor: 'pointer',
-                    }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#EEEDFE'; (e.currentTarget as HTMLButtonElement).style.color = '#5B4EE8'; }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'white'; (e.currentTarget as HTMLButtonElement).style.color = '#1a1a1a'; }}
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
+              {/* Quick start chips — use LLM-generated prompts if available, else hardcoded */}
+              {terraformPrompts.length > 0 ? (
+                <div style={{ maxWidth: '760px', width: '100%' }}>
+                  {/* Header pill */}
+                  <div style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '6px', margin: '0 auto 16px',
+                    padding: '5px 14px', borderRadius: '20px',
+                    background: 'linear-gradient(135deg, #EEEDFE 0%, #F5F3FF 100%)',
+                    border: '1px solid #DDD6FE',
+                  }}>
+                    <i className="ti ti-sparkles" style={{ fontSize: '13px', color: '#7C3AED' }} />
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#6D28D9', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      {terraformPrompts.length} prompts from your diagram
+                    </span>
+                  </div>
+
+                  {/* Prompt cards (show first 6) */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '10px' }}>
+                    {terraformPrompts.slice(0, contextVisible ? terraformPrompts.length : 6).map((p, i) => (
+                      <button
+                        key={i}
+                        onClick={() => { setInput(p.prompt); setTimeout(() => textareaRef.current?.focus(), 50); }}
+                        style={{
+                          padding: '0', borderRadius: '10px', overflow: 'hidden',
+                          border: '1px solid #E5E7EB', background: 'white',
+                          fontSize: '12.5px', color: '#1a1a1a', cursor: 'pointer',
+                          textAlign: 'left', lineHeight: '1.45',
+                          transition: 'all 0.2s ease', display: 'flex',
+                        }}
+                        onMouseEnter={(e) => {
+                          const el = e.currentTarget as HTMLButtonElement;
+                          el.style.borderColor = '#C7C3F9';
+                          el.style.boxShadow = '0 3px 12px rgba(91,78,232,0.1)';
+                          el.style.transform = 'translateY(-1px)';
+                        }}
+                        onMouseLeave={(e) => {
+                          const el = e.currentTarget as HTMLButtonElement;
+                          el.style.borderColor = '#E5E7EB';
+                          el.style.boxShadow = 'none';
+                          el.style.transform = 'none';
+                        }}
+                      >
+                        {/* Left accent */}
+                        <div style={{ width: '3px', flexShrink: 0, background: 'linear-gradient(180deg, #6366F1, #A78BFA)' }} />
+                        <div style={{ flex: 1, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{
+                              width: '18px', height: '18px', borderRadius: '5px',
+                              backgroundColor: '#EEEDFE', color: '#5B4EE8',
+                              fontSize: '10px', fontWeight: 700,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                            }}>
+                              {i + 1}
+                            </span>
+                            <span style={{
+                              fontSize: '9.5px', fontWeight: 700, textTransform: 'uppercase',
+                              letterSpacing: '0.05em', padding: '2px 8px', borderRadius: '12px',
+                              backgroundColor: '#F3F4F6', color: '#6B7280',
+                            }}>
+                              {p.category}
+                            </span>
+                          </div>
+                          <span style={{ flex: 1, fontSize: '12.5px', color: '#374151' }}>
+                            {p.prompt.length > 100 ? p.prompt.slice(0, 100) + '...' : p.prompt}
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Toggle */}
+                  {terraformPrompts.length > 6 && (
+                    <div
+                      style={{
+                        textAlign: 'center', marginTop: '12px', fontSize: '12px', fontWeight: 600,
+                        color: '#5B4EE8', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                      }}
+                      onClick={() => setContextVisible(!contextVisible)}
+                    >
+                      <i className={`ti ${contextVisible ? 'ti-chevron-up' : 'ti-chevron-down'}`} style={{ fontSize: '14px' }} />
+                      {contextVisible ? 'Show fewer prompts' : `Show all ${terraformPrompts.length} prompts`}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', maxWidth: '500px' }}>
+                  {diagramContext && diagramContext.detectedResources.length > 0 && (
+                    <button
+                      onClick={() => handleQuickStart('From my diagram ↑')}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '20px',
+                        border: '0.5px solid rgba(0,0,0,0.12)',
+                        background: 'white',
+                        fontSize: '12px',
+                        color: '#1a1a1a',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      From my diagram ↑
+                    </button>
+                  )}
+                  {QUICK_STARTS.map((q) => (
+                    <button
+                      key={q}
+                      onClick={() => handleQuickStart(q)}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '20px',
+                        border: '0.5px solid rgba(0,0,0,0.12)',
+                        background: 'white',
+                        fontSize: '12px',
+                        color: '#1a1a1a',
+                        cursor: 'pointer',
+                      }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#EEEDFE'; (e.currentTarget as HTMLButtonElement).style.color = '#5B4EE8'; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'white'; (e.currentTarget as HTMLButtonElement).style.color = '#1a1a1a'; }}
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -970,7 +1069,27 @@ export const TerraformChatPage = () => {
                 <i className="ti ti-copy" /> copy
               </CopyButton>
             )}
-            <button style={{
+            <button
+              onClick={() => {
+                if (!generatedFiles.length) return;
+                // Download all files as a single combined .tf or individual downloads
+                // Build a simple multi-file download via Blob
+                const allContent = generatedFiles.map((f: GeneratedFile) =>
+                  `# ════════════════════════════════════════\n# File: ${f.name}\n# ════════════════════════════════════════\n\n${f.content}`
+                ).join('\n\n\n');
+                const blob = new Blob([allContent], { type: 'application/octet-stream' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = generatedFiles.length === 1
+                  ? generatedFiles[0].name
+                  : 'terraform-code.tf';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+              }}
+              style={{
               padding: '4px 10px',
               borderRadius: '6px',
               border: '0.5px solid rgba(255,255,255,0.15)',

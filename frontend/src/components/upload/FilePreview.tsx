@@ -1,3 +1,20 @@
+/**
+ * FilePreview — displays the uploaded file name, size, and status badge.
+ *
+ * PURPOSE:
+ *   After a user drops or selects a file in UploadDropzone, this component
+ *   shows confirmation that the file was accepted and is ready for analysis.
+ *
+ * WHY IT EXISTS:
+ *   Separated from UploadDropzone so the dropzone stays focused on
+ *   file-input handling, while FilePreview handles the "already-uploaded"
+ *   state rendering.
+ *
+ * CONNECTIONS:
+ *   • UploadPage.tsx     → conditionally renders FilePreview after upload
+ *   • UploadDropzone.tsx → sets the uploadedFile state that feeds this
+ */
+
 import { UploadedFile } from '../../types/schema';
 
 interface FilePreviewProps {

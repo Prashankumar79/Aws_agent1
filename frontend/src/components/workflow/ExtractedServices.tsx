@@ -1,3 +1,21 @@
+/**
+ * ExtractedServices — displays AI-detected architecture components.
+ *
+ * PURPOSE:
+ *   After vision analysis, shows each detected cloud resource (EC2, S3,
+ *   etc.) with its type, provider, confidence score, and any detected labels.
+ *   While analysis is running, a skeleton shimmer grid is shown instead.
+ *
+ * WHY IT EXISTS:
+ *   This is the primary feedback UI for the AI vision step. Users can
+ *   verify that the diagram was understood correctly before proceeding
+ *   to design document generation.
+ *
+ * CONNECTIONS:
+ *   • workflowStore.ts → contextPack (vision result), isAnalyzing flag
+ *   • UploadPage.tsx   → conditionally renders this below the file preview
+ */
+
 import { useWorkflowStore } from '../../store/workflowStore';
 
 interface Service {

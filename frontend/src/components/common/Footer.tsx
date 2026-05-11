@@ -1,3 +1,14 @@
+/**
+ * Footer — app footer with branding, copyright, and nav links.
+ *
+ * PURPOSE:
+ *   Persistent footer shown on all pages. Contains copyright notice
+ *   and placeholder links for Privacy, Terms, and Docs.
+ *
+ * CONNECTIONS:
+ *   • App.tsx → renders Footer below the main page content
+ */
+
 import React from 'react';
 
 export const Footer = () => {

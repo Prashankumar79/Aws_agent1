@@ -1,3 +1,24 @@
+/**
+ * UploadPage — Step 1 of the workflow: file upload + provider selection.
+ *
+ * PURPOSE:
+ *   Orchestrates the upload, preview, cloud provider selection, and
+ *   the "Generate Design Document" action. All sections are stacked
+ *   vertically in a single-page layout.
+ *
+ * WHY IT EXISTS:
+ *   Centralizes all pre-analysis UI in one place so the user has a
+ *   clear linear flow: upload → select provider → click Analyse.
+ *
+ * CONNECTIONS:
+ *   • UploadDropzone.tsx      → handles file drop/select
+ *   • FilePreview.tsx         → shows the uploaded file details
+ *   • ExtractedServices.tsx   → shows detected services after analysis
+ *   • CloudSelector.tsx       → lets user pick AWS or Azure
+ *   • AnalyseButton.tsx       → triggers the full pipeline
+ *   • ClearButton.tsx         → (currently non-functional) should reset state
+ */
+
 import { UploadDropzone } from '../components/upload/UploadDropzone';
 import { FilePreview } from '../components/upload/FilePreview';
 import { CloudSelector } from '../components/cloud-selector/CloudSelector';

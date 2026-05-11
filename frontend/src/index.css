@@ -479,149 +479,262 @@ body {
 }
 
 /* ═════════════════════════════════════════════════════════════════
-   Markdown Streaming Body — ChatGPT/Claude-like styling
+   Markdown Streaming Body — Premium Design Document Styling
    ═════════════════════════════════════════════════════════════════ */
 
 .streaming-content {
-  max-width: 800px;
+  max-width: 860px;
   margin: 0 auto;
   background: white;
-  border-radius: 12px;
-  border: 0.5px solid rgba(0,0,0,0.08);
-  padding: 32px 36px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  border-radius: 16px;
+  border: 1px solid rgba(0,0,0,0.06);
+  padding: 40px 48px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.03), 0 8px 32px rgba(0,0,0,0.04);
 }
 
 .md-body {
   font-size: 15px;
-  line-height: 1.75;
+  line-height: 1.8;
   color: #1a1a1a;
   user-select: text;
   -webkit-user-select: text;
 }
 
-/* Headings */
+/* ── Headings ── */
 .md-h1 {
-  font-size: 22px;
-  font-weight: 600;
-  margin: 28px 0 14px;
-  color: #1a1a1a;
-  padding-bottom: 8px;
-  border-bottom: 1.5px solid #EEEDFE;
+  font-size: 26px;
+  font-weight: 700;
+  margin: 32px 0 16px;
+  color: #0f0f0f;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #EEEDFE;
+  letter-spacing: -0.02em;
 }
 .md-h2 {
-  font-size: 18px;
-  font-weight: 600;
-  margin: 24px 0 10px;
-  color: #1a1a1a;
+  font-size: 19px;
+  font-weight: 700;
+  margin: 32px 0 12px;
+  color: #0f0f0f;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 8px;
+  letter-spacing: -0.01em;
+}
+.md-h2-accent {
+  width: 4px;
+  height: 20px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #5B4EE8, #8B5CF6);
+  flex-shrink: 0;
 }
 .md-h3 {
-  font-size: 15px;
+  font-size: 15.5px;
   font-weight: 600;
-  margin: 18px 0 8px;
-  color: #2d2d2d;
+  margin: 20px 0 8px;
+  color: #1a1a1a;
+  padding-left: 14px;
+  border-left: 2.5px solid #E5E7EB;
 }
 
-/* Body text */
+/* ── Body text ── */
 .md-p {
   margin: 8px 0;
-  color: #3a3a3a;
+  color: #374151;
+  font-size: 14.5px;
+  line-height: 1.8;
 }
 
-/* Spacer between paragraphs */
+/* ── Spacer between paragraphs ── */
 .md-spacer {
-  height: 4px;
+  height: 6px;
 }
 
-/* Callout blocks (WARNING, IMPORTANT) */
+/* ── Callout blocks (WARNING, IMPORTANT) ── */
 .md-callout {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  padding: 12px 14px;
-  border-radius: 10px;
-  margin: 14px 0;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  margin: 16px 0;
   font-size: 13.5px;
-  line-height: 1.6;
+  line-height: 1.65;
 }
-.md-callout i {
-  font-size: 18px;
+.md-callout-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  margin-top: 1px;
+}
+.md-callout-icon i {
+  font-size: 17px;
+}
+.md-callout-body {
+  flex: 1;
+}
+.md-callout-body strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
 }
 .md-callout-warn {
-  background: #FAEEDA;
-  color: #854F0B;
-  border-left: 3px solid #BA7517;
+  background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%);
+  color: #92400E;
+  border: 1px solid #FDE68A;
 }
+.md-callout-warn .md-callout-icon {
+  background: #FDE68A;
+}
+.md-callout-warn .md-callout-icon i { color: #D97706; }
 .md-callout-info {
-  background: #E6F1FB;
-  color: #185FA5;
-  border-left: 3px solid #2E7DD1;
+  background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%);
+  color: #1E40AF;
+  border: 1px solid #BFDBFE;
 }
+.md-callout-info .md-callout-icon {
+  background: #BFDBFE;
+}
+.md-callout-info .md-callout-icon i { color: #2563EB; }
 
-/* Blockquotes */
+/* ── Blockquotes ── */
 .md-quote {
   border-left: 3px solid #5B4EE8;
-  padding: 6px 0 6px 14px;
-  margin: 10px 0;
-  color: #6b6b6b;
+  padding: 10px 0 10px 16px;
+  margin: 12px 0;
+  color: #4B5563;
   font-size: 14px;
   line-height: 1.7;
+  background: linear-gradient(90deg, rgba(91,78,232,0.03) 0%, transparent 100%);
+  border-radius: 0 8px 8px 0;
 }
 
-/* Lists */
+/* ── Lists ── */
 .md-li {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  margin: 5px 0;
+  gap: 10px;
+  margin: 6px 0;
   padding-left: 4px;
-  color: #3a3a3a;
+  color: #374151;
+  font-size: 14.5px;
 }
 .md-bullet {
-  color: #5B4EE8;
-  font-weight: 700;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #5B4EE8;
   flex-shrink: 0;
-  line-height: 1.75;
+  margin-top: 10px;
 }
 .md-num {
-  color: #5B4EE8;
-  font-weight: 600;
-  font-size: 13px;
-  min-width: 18px;
-  text-align: right;
+  color: white;
+  font-weight: 700;
+  font-size: 10px;
+  min-width: 20px;
+  height: 20px;
+  background: #5B4EE8;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  line-height: 1.75;
+  margin-top: 4px;
 }
 
-/* Inline code */
+/* ── Inline code ── */
 .md-inline-code {
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-size: 13px;
-  background: #F5F3EE;
-  color: #854F0B;
-  padding: 2px 7px;
+  background: linear-gradient(135deg, #F5F3FF 0%, #EDE9FE 100%);
+  color: #6D28D9;
+  padding: 2px 8px;
   border-radius: 5px;
-  border: 0.5px solid rgba(0,0,0,0.08);
+  border: 0.5px solid #DDD6FE;
 }
+
+/* ═══ Premium Table Styling ═══ */
+.md-table-wrapper {
+  margin: 16px 0;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #E5E7EB;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.md-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.md-table thead {
+  background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%);
+}
+.md-table thead tr {
+  border-bottom: 2px solid #E2E8F0;
+}
+.md-table th {
+  padding: 12px 14px;
+  text-align: left;
+  font-weight: 700;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #475569;
+  white-space: nowrap;
+}
+.md-table tbody tr {
+  border-bottom: 1px solid #F1F5F9;
+  transition: background-color 0.1s ease;
+}
+.md-table tbody tr:last-child {
+  border-bottom: none;
+}
+.md-table tbody tr:hover {
+  background-color: #FAFBFF;
+}
+.md-table tbody tr:nth-child(even) {
+  background-color: #FAFBFC;
+}
+.md-table tbody tr:nth-child(even):hover {
+  background-color: #F5F7FF;
+}
+.md-table td {
+  padding: 10px 14px;
+  color: #374151;
+  vertical-align: top;
+}
+.md-table td:first-child {
+  font-weight: 500;
+  color: #1F2937;
+}
+/* Status indicator cells */
+.md-cell-pass { color: #059669; font-weight: 500; }
+.md-cell-fail { color: #DC2626; font-weight: 500; }
+.md-cell-warn { color: #D97706; font-weight: 500; }
 
 /* ── Fenced code blocks ── */
 .md-code-block {
   background: #1E1E2E;
-  border-radius: 10px;
-  margin: 14px 0;
+  border-radius: 12px;
+  margin: 18px 0;
   overflow: hidden;
-  border: 0.5px solid rgba(255,255,255,0.06);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
 }
 .md-code-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 14px;
+  padding: 10px 16px;
   background: rgba(255,255,255,0.04);
-  border-bottom: 0.5px solid rgba(255,255,255,0.06);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
 }
 .md-code-lang {
   font-size: 11px;
@@ -636,26 +749,27 @@ body {
   border: none;
   color: #A6ADC8;
   cursor: pointer;
-  padding: 4px;
-  border-radius: 5px;
-  transition: background 0.15s;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  transition: all 0.15s;
 }
 .md-code-copy:hover {
-  background: rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.1);
   color: #CDD6F4;
 }
 .md-pre {
   margin: 0;
-  padding: 14px 16px;
+  padding: 16px 18px;
   overflow-x: auto;
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: #CDD6F4;
   background: transparent;
 }
 
-/* ── HCL syntax highlighting ── */
+/* ── HCL syntax highlighting (Catppuccin Mocha) ── */
 .hcl-comment   { color: #6C7086; font-style: italic; }
 .hcl-string    { color: #A6E3A1; }
 .hcl-keyword   { color: #F38BA8; font-weight: 600; }
@@ -674,42 +788,33 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  padding: 5px 12px;
-  border-radius: 6px;
-  margin: 10px 0 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  margin: 12px 0 6px;
   font-family: 'SF Mono', monospace;
 }
 .md-diff-before {
-  background: #FEE2E2;
+  background: linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%);
   color: #991B1B;
-  border: 0.5px solid #FECACA;
+  border: 1px solid #FECACA;
 }
 .md-diff-before i { color: #DC2626; }
 .md-diff-after {
-  background: #DCFCE7;
+  background: linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%);
   color: #166534;
-  border: 0.5px solid #BBF7D0;
+  border: 1px solid #BBF7D0;
 }
 .md-diff-after i { color: #16A34A; }
 
-/* Table rows */
-.md-table-row {
-  font-family: monospace;
-  font-size: 12.5px;
-  color: #6b6b6b;
-  margin: 1px 0;
-  padding: 3px 0;
-  border-bottom: 0.5px solid rgba(0,0,0,0.06);
-}
-
-/* Horizontal rule */
+/* ── Horizontal rule ── */
 .md-hr {
   border: none;
-  border-top: 1px solid rgba(0,0,0,0.08);
-  margin: 24px 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, #E5E7EB 20%, #E5E7EB 80%, transparent 100%);
+  margin: 32px 0;
 }
 
-/* Cursor blinking at end of content */
+/* ── Cursor blinking at end of content ── */
 .stream-cursor {
   display: inline-block;
   width: 2.5px;
@@ -721,13 +826,13 @@ body {
   border-radius: 1px;
 }
 
-/* Smooth fade-in for new content */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
+/* ── Smooth fade-in for new content ── */
+@keyframes contentFadeIn {
+  from { opacity: 0; transform: translateY(3px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 .md-body > * {
-  animation: fadeIn 0.15s ease-out;
+  animation: contentFadeIn 0.12s ease-out;
 }
 
 /* ── Typing indicator bounce ── */
@@ -739,11 +844,14 @@ body {
 /* ── Responsive: mobile sidebar hidden ── */
 @media (max-width: 768px) {
   .streaming-content {
-    padding: 20px 16px;
+    padding: 24px 18px;
+    border-radius: 12px;
   }
   .md-body {
     font-size: 14px;
   }
-  .md-h1 { font-size: 20px; }
-  .md-h2 { font-size: 16px; }
+  .md-h1 { font-size: 22px; }
+  .md-h2 { font-size: 17px; }
+  .md-table { font-size: 12px; }
+  .md-table th, .md-table td { padding: 8px 10px; }
 }

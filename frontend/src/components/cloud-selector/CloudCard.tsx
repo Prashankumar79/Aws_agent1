@@ -1,3 +1,19 @@
+/**
+ * CloudCard — clickable card for selecting a cloud provider.
+ *
+ * PURPOSE:
+ *   Displays a single cloud provider (AWS or Azure) with its services list,
+ *   visual selection state (checkmark, highlighted border), and hover effects.
+ *
+ * WHY IT EXISTS:
+ *   Abstracted from CloudSelector so the card UI logic (colors, icons,
+ *   selection feedback) lives in its own testable unit.
+ *
+ * CONNECTIONS:
+ *   • CloudSelector.tsx  → renders one CloudCard per provider
+ *   • UploadPage.tsx     → contains the CloudSelector section
+ */
+
 import { CloudProvider } from '../../types/schema';
 
 interface CloudCardProps {

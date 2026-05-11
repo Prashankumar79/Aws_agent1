@@ -1,3 +1,15 @@
+/**
+ * LoadingOverlay — full-screen spinner with pipeline stage message.
+ *
+ * PURPOSE:
+ *   Blocks the UI while the backend pipeline runs (vision analysis,
+ *   graph building, design doc generation). Shows a rotating spinner
+ *   and the current pipeline stage label passed from AnalyseButton.
+ *
+ * CONNECTIONS:
+ *   • AnalyseButton.tsx → passes the current pipelineStage string
+ */
+
 interface LoadingOverlayProps {
   message?: string;
 }

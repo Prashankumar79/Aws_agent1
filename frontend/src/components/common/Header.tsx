@@ -1,3 +1,15 @@
+/**
+ * Header — top navigation bar with branding and workflow tabs.
+ *
+ * PURPOSE:
+ *   Shows the InfraSketch logo, three workflow tabs (Upload, Design doc,
+ *   Terraform), and a user avatar. Tabs are clickable for navigation.
+ *
+ * CONNECTIONS:
+ *   • App.tsx          → renders Header at the top of every page
+ *   • workflowStore.ts → currentStep / setCurrentStep controls tab state
+ */
+
 import { useWorkflowStore } from '../../store/workflowStore';
 
 const TABS = [

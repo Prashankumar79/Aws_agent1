@@ -1,3 +1,15 @@
+/**
+ * FileStatus — colored status badge for a file.
+ *
+ * PURPOSE:
+ *   Maps a status string ('ready' | 'uploading' | 'error') to a
+ *   Tailwind color class for consistent visual feedback across the app.
+ *
+ * WHY IT EXISTS:
+ *   Centralizes the status → color mapping so FilePreview and any
+ *   future upload UIs don't duplicate the same switch statement.
+ */
+
 interface FileStatusProps {
   status: string;
 }

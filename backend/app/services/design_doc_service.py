@@ -54,14 +54,20 @@ logger = logging.getLogger(__name__)
 # SHARED SYSTEM PROMPT — 8 lines, applied to every call
 # ─────────────────────────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT = """You are a principal cloud architect writing a design document.
-Rules:
-- Use Markdown. ## for sections, ### for subsections, tables where specified.
-- Be specific — name exact services, resource types, and config values.
-- Be honest — call out gaps and risks clearly.
+SYSTEM_PROMPT = """You are a principal cloud architect at a Fortune-500 company writing an architecture design document that will be reviewed by engineering leadership, security teams, and auditors.
+
+WRITING STANDARDS:
+- Use Markdown. ## for sections, ### for subsections, properly formatted tables with | header | separators.
+- Be deeply specific — name EXACT services, instance types, SKUs, config values, and ARN patterns.
+- Be brutally honest — call out every gap, risk, and missing control clearly.
 - No filler phrases. No generic advice. Every sentence must be actionable or informative.
-- Use > [!WARNING] and > [!IMPORTANT] callout blocks for critical findings.
-- Return only the Markdown content for your assigned section. No preamble."""
+- Use > [!WARNING] for security vulnerabilities and production-blocking issues.
+- Use > [!IMPORTANT] for architectural decisions that need immediate attention.
+- Tables MUST use proper Markdown format: header row, separator row (|---|---|), then data rows.
+- For status/health indicators: use ✅ (pass), ⚠️ (needs attention), ❌ (critical gap).
+- Include specific metrics, thresholds, and SLA numbers where applicable.
+- Reference AWS/Azure Well-Architected Framework pillars when relevant.
+- Return only the Markdown content for your assigned section. No preamble, no "Here is..." intros."""
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -82,31 +88,42 @@ Connections ({connection_count}):
 Write exactly these sections:
 
 ## 1. Executive Summary
-3–4 sentences for a non-technical CEO: what it does, who uses it, scale, production-readiness.
-No jargon. If you use an acronym, explain it.
+4–5 sentences for a non-technical CEO. Cover: what the system does, who it serves, expected scale (users/RPS/data volume), current production-readiness score (1–5), and one critical action item.
+No jargon. If you use an acronym, explain it in parentheses.
 
 ## 2. What This System Does
 
 ### 2.1 The Big Picture
-2–3 paragraphs using a real-world analogy. Prose only, no bullets.
+2–3 paragraphs using a real-world analogy (e.g., "Think of it as a post office..."). Prose only, no bullets. End with the key architectural insight.
 
-### 2.2 Actors
-Table: Actor | Role | What They Do | How Often
+### 2.2 Key Actors & Stakeholders
+| Actor | Role | Primary Actions | Frequency | SLA Expectation |
+|-------|------|-----------------|-----------|-----------------|
+(Fill with specific actors inferred from the architecture)
 
-### 2.3 The Problem It Solves
-Three paragraphs: (1) before this existed, (2) what it automates, (3) business value.
+### 2.3 Business Value & Problem Statement
+Three concise paragraphs: (1) what existed before / manual pain points, (2) what this architecture automates or enables, (3) quantifiable business value (cost savings, speed improvement, reliability gain).
 
 ## 3. Architecture Overview
 
-### 3.1 Pattern
-Name the canonical pattern. Explain in 2 sentences why it fits this use case.
+### 3.1 Architecture Pattern
+Name the canonical pattern (e.g., "Event-Driven Microservices", "Three-Tier Web Application", "Serverless Data Pipeline"). Explain in 2–3 sentences why this pattern fits the scale and use case.
 
 ### 3.2 Deployment Topology
-Table: Dimension | Detail  (Cloud, Scope, Accounts/Regions, AZs, Network)
+| Dimension | Detail |
+|-----------|--------|
+| Cloud Provider | ... |
+| Region Strategy | ... |
+| Account Structure | ... |
+| Availability Zones | ... |
+| Network Topology | ... |
+| Environment Separation | ... |
 
 ### 3.3 Service Inventory
-Table: # | Service Name | {cloud} Service | Layer | Account | Role
-Layer = Edge|Compute|Data|Messaging|Security|Observability|Management|Networking"""
+| # | Service Name | {cloud} Service | Layer | Purpose | Criticality |
+|---|-------------|-----------------|-------|---------|-------------|
+Layer categories: Edge / Compute / Data / Messaging / Security / Observability / Management / Networking
+Criticality: CRITICAL / HIGH / MEDIUM / LOW"""
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -146,22 +163,36 @@ Mechanism, trust relationship, security controls. Skip if none.
 
 ### 5.1 Posture Summary
 > [!IMPORTANT]
-> One sentence on overall posture — be specific about what's good and what's missing.
+> One clear sentence on overall security posture. Followed by 2–3 specific callouts on what's implemented well and what's critically missing.
 
-### 5.2 Controls Inventory
-Table: Control | Type | Protects | Status ✅/⚠️/❌
+### 5.2 Security Controls Matrix
+| Control | Type | Protects | Status | Gap / Notes |
+|---------|------|----------|--------|-------------|
+(Preventive, Detective, Corrective controls — at least 8 rows)
 
-### 5.3 IAM
-Least-privilege? Cross-account scoping? Permission boundaries?
+### 5.3 Identity & Access Management
+- Least-privilege assessment (specific over-permissioned roles if any)
+- Cross-account trust relationships and scoping
+- Permission boundaries and service control policies
+- MFA enforcement status
 
 ### 5.4 Network Security
-What's public vs private? Security group tightness? Segmentation?
+- Public exposure surface (list all internet-facing endpoints)
+- Security group analysis (overly permissive rules)
+- Network segmentation and micro-segmentation
+- VPC isolation and subnet strategy
 
 ### 5.5 Data Protection
-Encryption at rest (which services, which keys), in transit (TLS version), secrets management.
+| Data Category | At Rest | In Transit | Key Management | Rotation |
+|--------------|---------|------------|----------------|----------|
+(Cover all data stores. Specify encryption standard: AES-256, TLS 1.3, etc.)
 
-### 5.6 Audit & Compliance
-CloudTrail/Monitor enabled? Compliance frameworks needed? Gaps?"""
+### 5.6 Audit, Logging & Compliance
+- CloudTrail / Activity Log coverage: ✅/❌
+- VPC Flow Logs: ✅/❌
+- Application-level logging: ✅/❌
+- Compliance frameworks applicable (SOC2, HIPAA, PCI-DSS, ISO 27001)
+- Gaps that block compliance certification"""
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -235,12 +266,22 @@ Same format but briefer.
 
 ## 11. Well-Architected Scorecard
 
-### 11.1 Scores
-Table: Pillar | Score | Status ✅/⚠️/❌ | Key Finding
-Pillars: Operational Excellence, Security, Reliability, Performance, Cost, Sustainability, Overall
+### 11.1 Pillar Scores
+| Pillar | Score (1-5) | Status | Key Finding | Priority Fix |
+|--------|-------------|--------|-------------|--------------|
+| Operational Excellence | ... | ✅/⚠️/❌ | ... | ... |
+| Security | ... | ✅/⚠️/❌ | ... | ... |
+| Reliability | ... | ✅/⚠️/❌ | ... | ... |
+| Performance Efficiency | ... | ✅/⚠️/❌ | ... | ... |
+| Cost Optimisation | ... | ✅/⚠️/❌ | ... | ... |
+| Sustainability | ... | ✅/⚠️/❌ | ... | ... |
+| **Overall** | ... | ... | ... | ... |
 
-### 11.2 Benchmark
-3 bullets: what a mature version looks like, what 90% of prod systems have that this misses, what this did well."""
+### 11.2 Industry Benchmark Comparison
+3 focused bullets:
+- **Best-in-class:** What a mature, production-hardened version of this architecture looks like
+- **Gap analysis:** What 90% of production systems have that this architecture is missing
+- **Strengths:** What this architecture does particularly well vs. industry standard"""
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -260,13 +301,24 @@ Write exactly these sections:
 ## 12. Infrastructure Optimisation
 
 ### 12.1 Terraform Recommendations
-For the 2–3 most impactful changes, show before/after HCL:
+For the 2–3 most impactful changes, show BEFORE and AFTER HCL code.
+Format EXACTLY like this (use the text labels AND fenced code blocks):
+
+BEFORE
 ```hcl
-# BEFORE
-...
-# AFTER (production-ready)
-...
+resource "aws_example" "basic" {{
+  # minimal config
+}}
 ```
+
+AFTER (production-ready)
+```hcl
+resource "aws_example" "production" {{
+  # full production config with comments explaining each addition
+}}
+```
+
+Show real, complete resources — not snippets. Include inline # comments for every significant addition.
 
 ### 12.2 Serverless Optimisation
 If Lambda present: memory sizing, cold start mitigation, timeout tuning.
@@ -301,6 +353,53 @@ Per-component rollback steps.
 ## 15. Glossary
 Table: Term | Plain-English Explanation
 Every {cloud}-specific term used in this document."""
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CALL 5 — TERRAFORM PROMPTS
+# 20 precise, image-aware prompts the user can fire on the Terraform chat page
+# Input: full component + connection context  (~400 tokens)
+# ─────────────────────────────────────────────────────────────────────────────
+
+TERRAFORM_PROMPTS_PROMPT = """You are analysing a {cloud} architecture diagram that contains:
+
+Components ({component_count}):
+{components_text}
+
+Connections ({connection_count}):
+{connections_text}
+
+Generate exactly 20 specific Terraform code-generation prompts. Each prompt MUST:
+- Reference the EXACT services detected above (not generic examples).
+- Be a complete, self-contained instruction that an AI can turn into production-ready HCL.
+- Cover a different infrastructure concern.
+- Be ordered from foundational → application → operational.
+
+Use this EXACT format (one prompt per line):
+
+1. [Networking] Create a VPC with ...
+2. [Networking] Configure security groups for ...
+3. [Networking] Set up NAT gateway / VPC endpoints for ...
+4. [IAM] Define IAM roles and policies for ...
+5. [IAM] Create KMS keys and encryption policies for ...
+6. [Compute] Provision {cloud} compute resources for ...
+7. [Compute] Configure auto-scaling for ...
+8. [Compute] Set up container orchestration for ... (if applicable)
+9. [Storage] Create storage buckets / volumes for ...
+10. [Database] Provision database instances for ...
+11. [Load Balancing] Set up load balancer for ...
+12. [DNS & CDN] Configure DNS records / CDN for ...
+13. [Messaging] Create message queues / event buses for ...
+14. [Messaging] Set up notification topics for ...
+15. [Monitoring] Create CloudWatch / Monitor dashboards and alarms for ...
+16. [Logging] Configure centralised logging for ...
+17. [CI/CD] Set up deployment pipeline for ...
+18. [Backup] Configure automated backups for ...
+19. [Cost] Implement cost controls and budget alerts for ...
+20. [Compliance] Add compliance tags and audit trail for ...
+
+Replace the "..." with architecture-specific details drawn from the components above.
+Return ONLY the 20 numbered prompts. No preamble, no summary."""
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -398,8 +497,16 @@ class DesignDocGenerator:
             deployment_phases  = self._infer_phases(components),
         ), max_tokens=1800)
 
+        terraform_prompts = self._call(TERRAFORM_PROMPTS_PROMPT.format(
+            cloud              = cloud_label,
+            component_count    = len(components),
+            components_text    = components_text,
+            connection_count   = len(connections),
+            connections_text   = connections_text,
+        ), max_tokens=3500)
+
         # Stitch sections together
-        content = self._stitch(cloud_label, snapshot, flows, audit, guidance)
+        content = self._stitch(cloud_label, snapshot, flows, audit, guidance, terraform_prompts)
 
         return {
             "title":                self._extract_title(content, cloud_label),
@@ -526,10 +633,11 @@ class DesignDocGenerator:
         )[:300]
 
         SECTION_TITLES = {
-            "snapshot": "Architecture Snapshot",
-            "flows":    "Data & Traffic Flows",
-            "audit":    "Security & Compliance Audit",
-            "guidance": "Operational Guidance",
+            "snapshot":           "Architecture Snapshot",
+            "flows":              "Data & Traffic Flows",
+            "audit":              "Security & Compliance Audit",
+            "guidance":           "Operational Guidance",
+            "terraform_prompts": "Terraform Generation Prompts",
         }
 
         calls = [
@@ -556,6 +664,13 @@ class DesignDocGenerator:
                 service_names=service_names,
                 deployment_phases=self._infer_phases(components),
             ), 1800),
+            ("terraform_prompts", TERRAFORM_PROMPTS_PROMPT.format(
+                cloud=cloud_label,
+                component_count=len(components),
+                components_text=components_text,
+                connection_count=len(connections),
+                connections_text=connections_text,
+            ), 3500),
         ]
 
         for section_name, prompt, max_tokens in calls:
@@ -647,6 +762,7 @@ class DesignDocGenerator:
         flows:    str,
         audit:    str,
         guidance: str,
+        terraform_prompts: str = "",
     ) -> str:
         header = (
             f"# {cloud} Architecture — Design Document\n\n"
@@ -659,7 +775,7 @@ class DesignDocGenerator:
             "*Document generated from architecture diagram analysis.*  \n"
             "*Review and validate all assumptions before using in production.*"
         )
-        sections = [s for s in [snapshot, flows, audit, guidance] if s.strip()]
+        sections = [s for s in [snapshot, flows, audit, guidance, terraform_prompts] if s.strip()]
         return header + "\n\n---\n\n".join(sections) + footer
 
     # ── Post-processing ───────────────────────────────────────────────────────

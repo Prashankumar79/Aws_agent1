@@ -1,3 +1,22 @@
+/**
+ * UploadDropzone — file input area with drag-and-drop support.
+ *
+ * PURPOSE:
+ *   Accepts architecture diagram files (PNG, JPG, PDF, SVG, Draw.io)
+ *   via click-to-browse or drag-and-drop. Stores both a display object
+ *   (name, size, status) and the raw File object needed by the upload API.
+ *
+ * WHY IT EXISTS:
+ *   The file upload is the entry point of the entire workflow.
+ *   Extracting it into its own component keeps UploadPage.tsx clean
+ *   and allows dropzone-specific logic (drag events, file validation)
+ *   to be tested in isolation.
+ *
+ * CONNECTIONS:
+ *   • workflowStore.ts → setUploadedFile, setUploadedFileObject
+ *   • UploadPage.tsx   → renders this as the first section
+ */
+
 import { useRef } from 'react';
 import { useWorkflowStore } from '../../store/workflowStore';
 

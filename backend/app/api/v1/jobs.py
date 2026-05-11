@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import time
 import uuid
@@ -350,7 +351,7 @@ async def stream_design_doc_sections(job_id: str, cloud: str = Query(default="aw
             # from an async function. We push chunks into a queue from a
             # background thread so the event loop stays free for other requests.
             loop = asyncio.get_event_loop()
-            queue: asyncio.Queue = asyncio.Queue(maxsize=128)
+            queue: asyncio.Queue = asyncio.Queue()  # unbounded — safe, LLM output is finite
 
             def _produce():
                 """Run the sync boto3 generator in a background thread."""
@@ -389,8 +390,34 @@ async def stream_design_doc_sections(job_id: str, cloud: str = Query(default="aw
                 yield chunk  # forward to SSE client immediately
 
             # Store the complete design doc in the job for downstream use
-            content_parts = [section_texts.get(sec, "") for sec in ["snapshot", "flows", "audit", "guidance"]]
-            combined_content = "\n\n---\n\n".join(content_parts)
+            content_parts = [section_texts.get(sec, "") for sec in ["snapshot", "flows", "audit", "guidance", "terraform_prompts"]]
+            combined_content = "\n\n---\n\n".join(p for p in content_parts if p.strip())
+
+            # Parse the 20 Terraform prompts into a structured list
+            # LLM may wrap long prompts across multiple lines, so first merge
+            # continuation lines (lines that don't start with a number) back
+            # into the preceding numbered prompt.
+            tf_raw = section_texts.get("terraform_prompts", "")
+            merged_lines: list[str] = []
+            for line in tf_raw.splitlines():
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                if re.match(r'^\d+\.\s*\[', stripped):
+                    merged_lines.append(stripped)
+                elif merged_lines:
+                    # Continuation of previous prompt
+                    merged_lines[-1] += " " + stripped
+
+            terraform_prompts_list = []
+            for line in merged_lines:
+                m = re.match(r'^\d+\.\s*\[([^\]]+)\]\s*(.+)', line)
+                if m:
+                    terraform_prompts_list.append({
+                        "category": m.group(1).strip(),
+                        "prompt": m.group(2).strip(),
+                    })
+
             design_doc = {
                 "title": f"{cloud.upper()} Architecture Design Document",
                 "content": combined_content,
@@ -400,6 +427,7 @@ async def stream_design_doc_sections(job_id: str, cloud: str = Query(default="aw
                 "connection_count": len(connections),
                 "sections": list(section_texts.keys()),
                 "word_count": len(combined_content.split()),
+                "terraform_prompts": terraform_prompts_list,
             }
 
             design_docs = json.loads(job.get("design_docs_json", "{}"))
@@ -419,7 +447,9 @@ async def stream_design_doc_sections(job_id: str, cloud: str = Query(default="aw
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
+            "Content-Encoding": "identity",   # ← bypass GZipMiddleware buffering
         }
     )
 
@@ -463,7 +493,12 @@ async def terraform_chat_stream(body: ChatRequest):
     return StreamingResponse(
         generate(),
         media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+            "Content-Encoding": "identity",   # ← bypass GZipMiddleware buffering
+        }
     )
 
 

@@ -43,6 +43,7 @@ interface WorkflowState {
   uploadedFileObject: File | null;
   jobId: string | null;
   designDocs: Record<string, any>;
+  terraformPrompts: { category: string; prompt: string }[];
   isAnalyzing: boolean;
   setCurrentStep: (step: number) => void;
   setSelectedProvider: (provider: string) => void;
@@ -50,6 +51,7 @@ interface WorkflowState {
   setUploadedFileObject: (file: File | null) => void;
   setJobId: (jobId: string | null) => void;
   setDesignDocs: (docs: Record<string, any>) => void;
+  setTerraformPrompts: (prompts: { category: string; prompt: string }[]) => void;
   setIsAnalyzing: (isAnalyzing: boolean) => void;
   reset: () => void;
 }
@@ -66,6 +68,7 @@ export const useWorkflowStore = create<WorkflowState>((set) => ({
   uploadedFileObject: null,
   jobId: null,
   designDocs: {},
+  terraformPrompts: [],
   isAnalyzing: false,
   setCurrentStep: (step) => set({ currentStep: step }),
   setSelectedProvider: (provider) => set({ selectedProvider: provider }),
@@ -73,6 +76,7 @@ export const useWorkflowStore = create<WorkflowState>((set) => ({
   setUploadedFileObject: (file) => set({ uploadedFileObject: file }),
   setJobId: (jobId) => set({ jobId }),
   setDesignDocs: (docs) => set({ designDocs: docs }),
+  setTerraformPrompts: (prompts) => set({ terraformPrompts: prompts }),
   setIsAnalyzing: (isAnalyzing) => set({ isAnalyzing }),
   reset: () => set({
     currentStep: 1,
@@ -86,6 +90,7 @@ export const useWorkflowStore = create<WorkflowState>((set) => ({
     uploadedFileObject: null,
     jobId: null,
     designDocs: {},
+    terraformPrompts: [],
     isAnalyzing: false,
   }),
 }));

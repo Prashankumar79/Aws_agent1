@@ -1,3 +1,20 @@
+/**
+ * WorkflowStepper — sidebar showing pipeline progress (1 → 2 → 3).
+ *
+ * PURPOSE:
+ *   Visualizes which of the three workflow stages (Upload, Design doc,
+ *   Terraform) is active, completed, or pending. Uses a colored vertical
+ *   line and step indicators with animated transitions.
+ *
+ * WHY IT EXISTS:
+ *   Gives users immediate orientation about where they are in the
+ *   overall pipeline and what comes next.
+ *
+ * CONNECTIONS:
+ *   • workflowStore.ts → steps array, currentStep
+ *   • App.tsx         → rendered as the left sidebar
+ */
+
 import { useWorkflowStore } from '../../store/workflowStore';
 
 export const WorkflowStepper = () => {

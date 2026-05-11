@@ -1,3 +1,30 @@
+/**
+ * AnalyseButton — triggers the full AI pipeline: upload → vision → design doc.
+ *
+ * PURPOSE:
+ *   Starts the backend pipeline by calling api.startPipeline() with the
+ *   selected file and provider. Polls job status until completion, then
+ *   stores the design docs and advances the user to Step 2 (DesignDocPage).
+ *
+ * WHY IT EXISTS:
+ *   This is the single most important action in the app. Extracting it
+ *   into a dedicated component keeps UploadPage.tsx declarative while
+ *   allowing the button's complex async lifecycle to be self-contained.
+ *
+ * KEY CONCEPTS:
+ *   • Pipeline stages: UPLOADED → VISION_RUNNING → GRAPH_BUILT →
+ *     DESIGN_DOC_GENERATING → DESIGN_DOC_GENERATED.
+ *   • The design doc is streamed live on the next page; this component
+ *     only needs to wait until GRAPH_BUILT (or DESIGN_DOC_GENERATED).
+ *   • LoadingOverlay is shown while polling is active.
+ *
+ * CONNECTIONS:
+ *   • workflowStore.ts   → reads uploadedFileObject, selectedProvider,
+ *                            writes jobId, designDocs, currentStep
+ *   • api.ts            → startPipeline(), waitForCompletion()
+ *   • LoadingOverlay.tsx → shown during async polling
+ */
+
 import { useState } from 'react';
 import { useWorkflowStore } from '../../store/workflowStore';
 import { api } from '../../services/api';

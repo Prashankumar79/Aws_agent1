@@ -44,6 +44,7 @@ export interface DesignDoc {
   architecture_summary: string;   // First few lines of executive summary
   component_count: number;        // Number of cloud components detected by vision
   connection_count: number;       // Number of connections detected by vision
+  terraform_prompts?: { category: string; prompt: string }[];  // 20 LLM-generated prompts
 }
 
 /**

@@ -1,3 +1,22 @@
+/**
+ * CloudSelector — lets the user pick which cloud provider to target.
+ *
+ * PURPOSE:
+ *   Renders a grid of cloud provider cards (AWS, Azure). The selected
+ *   provider ID is written to the global workflow store and read by
+ *   AnalyseButton when starting the pipeline.
+ *
+ * WHY IT EXISTS:
+ *   Provider selection is a prerequisite step before analysis.
+ *   Extracting it into its own component keeps UploadPage.tsx clean
+ *   and allows the grid layout to evolve independently.
+ *
+ * CONNECTIONS:
+ *   • workflowStore.ts   → selectedProvider / setSelectedProvider
+ *   • CloudCard.tsx      → renders each provider card
+ *   • AnalyseButton.tsx  → reads selectedProvider to start pipeline
+ */
+
 import { useWorkflowStore } from '../../store/workflowStore';
 import { CloudCard } from './CloudCard';
 import { CloudProvider } from '../../types/schema';

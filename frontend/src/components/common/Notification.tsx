@@ -1,3 +1,14 @@
+/**
+ * Notification — info / success / warning / error banner.
+ *
+ * PURPOSE:
+ *   Displays contextual messages to the user (e.g. "RAG pipeline will
+ *   retrieve up-to-date cloud provider documentation...").
+ *
+ * CONNECTIONS:
+ *   • UploadPage.tsx → renders an info notification above action buttons
+ */
+
 interface NotificationProps {
   message: string;
   type?: 'info' | 'success' | 'warning' | 'error';
