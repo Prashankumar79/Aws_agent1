@@ -1,0 +1,36 @@
+# Build artifacts
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+node_modules/
+dist/
+.vite/
+
+# Git
+.git/
+.github/
+
+# IDE
+.vscode/
+.kiro/
+*.swp
+
+# Data (mounted as volumes in production)
+storage/
+backend/data/
+backend/logs/
+chroma_db/
+
+# Documentation (not needed in container)
+markdown/
+*.md
+!README.md
+
+# Environment (injected via secrets)
+.env
+backend/.env
+
+# OS
+.DS_Store
+Thumbs.db

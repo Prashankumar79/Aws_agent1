@@ -1,6 +1,7 @@
 import { useWorkflowStore } from '../store/workflowStore';
 import { api } from '../services/api';
 import { useState, useEffect, useRef, useCallback } from 'react';
+import DOMPurify from 'dompurify';
 
 /* ── Section metadata for sidebar progress ── */
 const SECTIONS = [
@@ -8,7 +9,7 @@ const SECTIONS = [
   { key: 'flows',             label: 'Data & Traffic Flows',       icon: 'ti-arrows-exchange' },
   { key: 'audit',             label: 'Security & Compliance',      icon: 'ti-shield-check' },
   { key: 'guidance',          label: 'Operational Guidance',       icon: 'ti-bulb' },
-  { key: 'terraform_prompts', label: 'Terraform Prompts (20)',     icon: 'ti-terminal-2' },
+  { key: 'terraform_prompts', label: 'Terraform Prompts',     icon: 'ti-terminal-2' },
 ];
 
 /* ── Category color map for prompt chips ── */
@@ -248,7 +249,12 @@ function markdownToHTML(md: string, fast = false): string {
    Component — ChatGPT-like streaming design document
    ══════════════════════════════════════════════════════════════ */
 export const DesignDocPage = () => {
-  const { designDocs, selectedProvider, jobId, setDesignDocs, setTerraformPrompts, setCurrentStep, terraformPrompts } = useWorkflowStore();
+  const {
+    designDocs, selectedProvider, jobId,
+    setDesignDocs, setTerraformPrompts, setCurrentStep, terraformPrompts,
+    designDocStreamStarted, setDesignDocStreamStarted,
+    streamedJobId, setStreamedJobId,
+  } = useWorkflowStore();
 
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamComplete, setStreamComplete] = useState(false);
@@ -257,7 +263,7 @@ export const DesignDocPage = () => {
   const [statusText, setStatusText] = useState('');
   const [renderedHTML, setRenderedHTML] = useState('');
   const [copied, setCopied] = useState(false);
-  const [streamKey, setStreamKey] = useState(0); // increment via handleRegenerate to re-run the stream effect
+  const [streamKey, setStreamKey] = useState(0);
 
   const markdownRef = useRef('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -288,7 +294,8 @@ export const DesignDocPage = () => {
       // While streaming, wait for a meaningful chunk before re-rendering
       if (isStreamingRef.current && len - lastRenderLenRef.current < 200) return;
       lastRenderLenRef.current = len;
-      setRenderedHTML(markdownToHTML(markdownRef.current, isStreamingRef.current));
+      const rawHtml = markdownToHTML(markdownRef.current, isStreamingRef.current);
+      setRenderedHTML(DOMPurify.sanitize(rawHtml));
     }, isStreamingRef.current ? 200 : 80);
   }, []); // ← empty deps: never recreated, reads live values via refs
 
@@ -323,16 +330,58 @@ export const DesignDocPage = () => {
       const visibleParts = parts.length >= 5 ? parts.slice(0, 4) : parts;
       const visibleContent = visibleParts.join('\n\n---\n\n');
       markdownRef.current = visibleContent;
-      setRenderedHTML(markdownToHTML(visibleContent, false));
+      setRenderedHTML(DOMPurify.sanitize(markdownToHTML(visibleContent, false)));
       setStreamComplete(true);
       setCompletedSections(['snapshot', 'flows', 'audit', 'guidance', 'terraform_prompts']);
       setStatusText('Design document complete');
-      // Load cached terraform prompts
+      // Load cached terraform prompts — check both inline and store-level
       if (Array.isArray(cached.terraform_prompts) && cached.terraform_prompts.length > 0) {
         setTerraformPrompts(cached.terraform_prompts);
+      } else if (terraformPrompts.length === 0 && jobId) {
+        // 🟢 BEGINNER: Inline prompts were empty (streaming parser missed them).
+        // Fetch from the top-level job field as a fallback.
+        api.getJobStatus(jobId).then(job => {
+          const tp = (job as any).terraform_prompts;
+          if (Array.isArray(tp) && tp.length > 0) setTerraformPrompts(tp);
+        }).catch(() => {});
       }
       return;
     }
+
+    // Guard: only auto-start streaming if explicitly triggered by AnalyseButton (designDocStreamStarted)
+    // OR if this is a Regenerate (streamKey > 0).
+    // If neither is true AND this job was already streamed before, don't re-stream on navigation.
+    const alreadyStreamed = streamedJobId === jobId;
+    if (!designDocStreamStarted && streamKey === 0 && alreadyStreamed) {
+      // User navigated back via header tab — try to load from backend cache instead of re-streaming
+      if (jobId) {
+        api.getJobStatus(jobId).then(job => {
+          if (job.design_docs) {
+            setDesignDocs(job.design_docs);
+            const doc = job.design_docs[selectedProvider];
+            if (doc?.content) {
+              const parts = doc.content.split('\n\n---\n\n');
+              const visibleParts = parts.length >= 5 ? parts.slice(0, 4) : parts;
+              markdownRef.current = visibleParts.join('\n\n---\n\n');
+              setRenderedHTML(DOMPurify.sanitize(markdownToHTML(markdownRef.current, false)));
+              setStreamComplete(true);
+              setCompletedSections(['snapshot', 'flows', 'audit', 'guidance', 'terraform_prompts']);
+              setStatusText('Design document complete');
+            }
+          }
+          const tp = (job as any).terraform_prompts;
+          if (Array.isArray(tp) && tp.length > 0) setTerraformPrompts(tp);
+        }).catch(() => {});
+      }
+      return;
+    }
+
+    // NOTE: Do NOT clear designDocStreamStarted or set streamedJobId in the
+    // synchronous part of this effect. React Strict Mode fires mount→cleanup→mount.
+    // If we mutate store state synchronously, it re-triggers this effect (infinite loop).
+    // Instead, we clear/set these AFTER the stream successfully connects (inside .then()).
+
+    // ── Setup ────────────────────────────────────────────────────────────
 
     // ── Setup ────────────────────────────────────────────────────────────
     let cancelled = false;
@@ -365,7 +414,7 @@ export const DesignDocPage = () => {
     const url = `/api/v1/jobs/${jobId}/stream-design-doc-sections?cloud=${cloud}`;
     console.log('[DesignDoc] Opening stream:', url);
 
-    // ── Fetch SSE stream ──────────────────────────────────────────────────
+    // 🟢 BEGINNER: Open the SSE connection to the backend. The connection stays open for minutes while the AI writes.
     fetch(url, { signal: ctrl.signal, headers: { Accept: 'text/event-stream' } })
       .then(async (response) => {
         if (cancelled) return;
@@ -374,27 +423,69 @@ export const DesignDocPage = () => {
 
         console.log('[DesignDoc] Stream connected');
         setStatusText('Generating design document...');
+        // React Strict Mode aborts the first effect run. Only mark the job as
+        // streamed after the surviving request has received a real response.
+        if (designDocStreamStarted) {
+          setDesignDocStreamStarted(false);
+        }
+        setStreamedJobId(jobId);
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
 
+        // 🟢 BEGINNER: Track which section we're currently receiving, using a local variable
+        // instead of React state to avoid stale closure issues inside the async loop.
         let activeSection = ''; // local tracking to avoid stale closure on state
 
+        // 🟢 BEGINNER: handleEvent processes each SSE event from the backend.
+        // Events tell us when a section starts, when new text arrives (delta), and when a section ends.
         const handleEvent = (data: string) => {
           if (cancelled) return;
           if (data === '[DONE]') {
+            // 🟢 BEGINNER: The backend sent the final sentinel. Mark streaming as complete.
             setIsStreaming(false);
             setStreamComplete(true);
             setCurrentSection('');
             setStatusText('Design document complete');
-            setRenderedHTML(markdownToHTML(markdownRef.current, false));
+            setRenderedHTML(DOMPurify.sanitize(markdownToHTML(markdownRef.current, false)));
+            // Mark this job as streamed so navigating back doesn't re-trigger
+            setStreamedJobId(jobId);
+            // 🟢 BEGINNER: After streaming, fetch the final structured data (including terraform prompts) from the job status.
             api.getJobStatus(jobId).then(job => {
               if (job.design_docs) {
                 setDesignDocs(job.design_docs);
-                const prompts = job.design_docs?.[selectedProvider]?.terraform_prompts;
+                // 🟢 BEGINNER: Terraform prompts may live in two places:
+                // 1. Inside design_docs[cloud].terraform_prompts (inline from streaming parser)
+                // 2. At the top-level job.terraform_prompts (from the background pipeline)
+                // Check both — the top-level field is the authoritative source.
+                const inlinePrompts = job.design_docs?.[selectedProvider]?.terraform_prompts;
+                const topLevelPrompts = (job as any).terraform_prompts;
+                const prompts = (Array.isArray(topLevelPrompts) && topLevelPrompts.length > 0)
+                  ? topLevelPrompts
+                  : inlinePrompts;
                 if (Array.isArray(prompts) && prompts.length > 0) {
                   setTerraformPrompts(prompts);
+                } else {
+                  // Prompts not ready yet — background pipeline may still be generating.
+                  // Retry a few times with increasing delay.
+                  const retryForPrompts = (attempt: number) => {
+                    if (cancelled || attempt > 5) return;
+                    setTimeout(() => {
+                      api.getJobStatus(jobId).then(retryJob => {
+                        const tp = (retryJob as any).terraform_prompts;
+                        const inlineTp = retryJob.design_docs?.[selectedProvider]?.terraform_prompts;
+                        const found = (Array.isArray(tp) && tp.length > 0) ? tp : inlineTp;
+                        if (Array.isArray(found) && found.length > 0) {
+                          setTerraformPrompts(found);
+                          console.log(`[DesignDoc] Terraform prompts loaded on retry ${attempt}`);
+                        } else {
+                          retryForPrompts(attempt + 1);
+                        }
+                      }).catch(() => retryForPrompts(attempt + 1));
+                    }, attempt * 3000); // 3s, 6s, 9s, 12s, 15s
+                  };
+                  retryForPrompts(1);
                 }
               }
             }).catch(() => {});
@@ -409,19 +500,21 @@ export const DesignDocPage = () => {
               return;
             }
             if (parsed.type === 'section_start') {
+              // 🟢 BEGINNER: Backend says a new section is starting. Update the active section and sidebar progress.
               activeSection = parsed.section;
               setCurrentSection(parsed.section);
               setStatusText(`Writing ${parsed.title || parsed.section}...`);
-              // Don't add separator before terraform_prompts since we won't render its raw text
+              // 🟢 BEGINNER: Add a horizontal rule between sections (except before terraform_prompts which renders as cards).
               if (markdownRef.current.length > 0 && parsed.section !== 'terraform_prompts') markdownRef.current += '\n\n---\n\n';
             } else if (parsed.type === 'delta') {
-              // Skip appending terraform_prompts raw text to the visible markdown body
-              // — it will be shown only as the styled blue cards
+              // 🟢 BEGINNER: New text chunk arrived. Append it to the markdown buffer and schedule a re-render.
+              // Skip terraform_prompts raw text — it's shown as styled cards instead.
               if (activeSection !== 'terraform_prompts') {
                 markdownRef.current += parsed.text;
                 scheduleRender();
               }
             } else if (parsed.type === 'section_end') {
+              // 🟢 BEGINNER: Section is complete. Add it to the completed sections list for the sidebar.
               setCompletedSections(prev => [...prev, parsed.section]);
             }
           } catch (e) {
@@ -429,6 +522,7 @@ export const DesignDocPage = () => {
           }
         };
 
+        // 🟢 BEGINNER: Read chunks from the stream in a loop until the stream is done or cancelled.
         while (!cancelled) {
           const { done, value } = await reader.read();
           if (done || cancelled) break;
@@ -449,7 +543,8 @@ export const DesignDocPage = () => {
         loadFallback(); // attempt to load already-generated doc from backend
       });
 
-    // ── Cleanup: React Strict Mode fires this immediately on first mount ──
+    // 🟢 BEGINNER: Cleanup function runs when the component unmounts or dependencies change.
+    // It cancels the fetch and clears any pending timers to prevent memory leaks.
     return () => {
       cancelled = true;
       ctrl.abort();
@@ -468,11 +563,15 @@ export const DesignDocPage = () => {
       const doc = job.design_docs?.[selectedProvider];
       if (doc?.content) {
         markdownRef.current = doc.content;
-        setRenderedHTML(markdownToHTML(doc.content, false));
+        setRenderedHTML(DOMPurify.sanitize(markdownToHTML(doc.content, false)));
         setDesignDocs(job.design_docs!);
         setCompletedSections(['snapshot', 'flows', 'audit', 'guidance', 'terraform_prompts']);
-        if (Array.isArray(doc.terraform_prompts) && doc.terraform_prompts.length > 0) {
-          setTerraformPrompts(doc.terraform_prompts);
+        // 🟢 BEGINNER: Check top-level terraform_prompts first (authoritative), then inline.
+        const topLevel = (job as any).terraform_prompts;
+        const inline = doc.terraform_prompts;
+        const prompts = (Array.isArray(topLevel) && topLevel.length > 0) ? topLevel : inline;
+        if (Array.isArray(prompts) && prompts.length > 0) {
+          setTerraformPrompts(prompts);
         }
       }
       setStreamComplete(true);
@@ -499,7 +598,9 @@ export const DesignDocPage = () => {
   };
 
   const handleRegenerate = () => {
-    setStreamKey(k => k + 1); // triggers streaming useEffect to re-run cleanly
+    setDesignDocStreamStarted(true); // allow streaming on regenerate
+    setStreamedJobId(null);          // clear so the guard doesn't block
+    setStreamKey(k => k + 1);
   };
 
   const buttonsDisabled = isStreaming;
@@ -617,6 +718,40 @@ export const DesignDocPage = () => {
       {/* ── Main Content ── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
+        {/* Tab Bar */}
+        <div style={{
+          display: 'flex',
+          gap: '4px',
+          padding: '8px 24px 0',
+          borderBottom: '0.5px solid rgba(0,0,0,0.12)',
+          backgroundColor: 'white',
+        }}>
+          {[
+            { key: 'design_doc' as const, label: 'Design Document', icon: 'ti-file-description' },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              style={{
+                padding: '8px 14px',
+                borderRadius: '8px 8px 0 0',
+                fontSize: '13px',
+                fontWeight: tab.key === 'design_doc' ? 500 : 400,
+                color: tab.key === 'design_doc' ? '#5B4EE8' : '#6b6b6b',
+                backgroundColor: tab.key === 'design_doc' ? '#FAFAFA' : 'transparent',
+                border: 'none',
+                borderBottom: tab.key === 'design_doc' ? '2px solid #5B4EE8' : '2px solid transparent',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <i className={`ti ${tab.icon}`} style={{ fontSize: '14px' }} />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         {/* Content Area */}
         <div
           ref={scrollRef}
@@ -625,6 +760,8 @@ export const DesignDocPage = () => {
             backgroundColor: '#FAFAFA',
           }}
         >
+          {(
+            <>
           {/* Streaming content */}
           {(renderedHTML || isStreaming) ? (
             <div className="streaming-content">
@@ -667,8 +804,21 @@ export const DesignDocPage = () => {
 
                   {/* ── Prompt grid ── */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '14px' }}>
-                    {terraformPrompts.map((p, i) => {
+                    {[...terraformPrompts]
+                      .sort((a, b) => {
+                        const pOrder: Record<string, number> = { P0: 0, P1: 1, P2: 2 };
+                        return (pOrder[a.priority || 'P1'] ?? 1) - (pOrder[b.priority || 'P1'] ?? 1);
+                      })
+                      .map((p, i) => {
                       const color = getCategoryColor(p.category);
+                      const priorityColors: Record<string, { bg: string; text: string }> = {
+                        P0: { bg: '#FEE2E2', text: '#991B1B' },
+                        P1: { bg: '#FEF3C7', text: '#92400E' },
+                        P2: { bg: '#E0E7FF', text: '#3730A3' },
+                      };
+                      const pColor = priorityColors[p.priority || 'P1'] || priorityColors.P1;
+                      const complexityIcons: Record<string, string> = { simple: 'ti-circle', moderate: 'ti-hexagon', complex: 'ti-diamond' };
+                      const cIcon = complexityIcons[p.complexity || 'moderate'] || 'ti-hexagon';
                       return (
                         <div
                           key={i}
@@ -699,8 +849,8 @@ export const DesignDocPage = () => {
                           <div style={{ width: '4px', flexShrink: 0, background: `linear-gradient(180deg, ${color.text}, ${color.border})` }} />
 
                           <div style={{ flex: 1, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {/* Top row: number + category badge */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {/* Top row: number + category badge + priority + complexity */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                               <span style={{
                                 width: '22px', height: '22px', borderRadius: '6px',
                                 backgroundColor: color.bg, color: color.text,
@@ -716,6 +866,28 @@ export const DesignDocPage = () => {
                               }}>
                                 {p.category}
                               </span>
+                              {/* Priority badge */}
+                              {p.priority && (
+                                <span style={{
+                                  fontSize: '9px', fontWeight: 800, textTransform: 'uppercase',
+                                  letterSpacing: '0.08em', padding: '2px 8px', borderRadius: '20px',
+                                  backgroundColor: pColor.bg, color: pColor.text,
+                                }}>
+                                  {p.priority}
+                                </span>
+                              )}
+                              {/* Complexity badge */}
+                              {p.complexity && (
+                                <span style={{
+                                  fontSize: '9px', fontWeight: 600, textTransform: 'capitalize',
+                                  padding: '2px 8px', borderRadius: '20px',
+                                  backgroundColor: '#F3F4F6', color: '#4B5563',
+                                  display: 'inline-flex', alignItems: 'center', gap: '3px',
+                                }}>
+                                  <i className={`ti ${cIcon}`} style={{ fontSize: '10px' }} />
+                                  {p.complexity}
+                                </span>
+                              )}
                             </div>
 
                             {/* Prompt text */}
@@ -723,10 +895,33 @@ export const DesignDocPage = () => {
                               {p.prompt}
                             </div>
 
-                            {/* CTA */}
+                            {/* Bottom row: resources + dependencies + CTA */}
                             <div style={{
-                              display: 'flex', alignItems: 'center', gap: '6px', marginTop: 'auto', paddingTop: '4px',
+                              display: 'flex', alignItems: 'center', gap: '8px', marginTop: 'auto', paddingTop: '4px', flexWrap: 'wrap',
                             }}>
+                              {/* Estimated resources */}
+                              {p.estimated_resources && p.estimated_resources > 0 && (
+                                <span style={{
+                                  fontSize: '10px', fontWeight: 600, color: '#6B7280',
+                                  display: 'inline-flex', alignItems: 'center', gap: '3px',
+                                }}>
+                                  <i className="ti ti-stack-2" style={{ fontSize: '12px' }} />
+                                  ~{p.estimated_resources} resources
+                                </span>
+                              )}
+                              {/* Dependencies */}
+                              {p.depends_on && p.depends_on.length > 0 && (
+                                <span style={{
+                                  fontSize: '10px', fontWeight: 500, color: '#9CA3AF',
+                                  display: 'inline-flex', alignItems: 'center', gap: '3px',
+                                }}>
+                                  <i className="ti ti-git-branch" style={{ fontSize: '11px' }} />
+                                  needs: {p.depends_on.join(', ')}
+                                </span>
+                              )}
+                              {/* Spacer */}
+                              <div style={{ flex: 1 }} />
+                              {/* CTA */}
                               <span style={{
                                 fontSize: '11.5px', fontWeight: 600, color: '#5B4EE8',
                                 padding: '4px 12px', borderRadius: '6px',
@@ -762,6 +957,9 @@ export const DesignDocPage = () => {
               </div>
             </div>
           )}
+            </>
+          )}
+
         </div>
 
         {/* ── Bottom Bar ── */}

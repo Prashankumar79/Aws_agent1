@@ -25,61 +25,115 @@
  *   • LoadingOverlay.tsx → shown during async polling
  */
 
+// 🟢 BEGINNER: useState is a React hook that lets this component remember values between renders.
+// Here we'll use it to track the current pipeline stage message ("Uploading...", "Analyzing...", etc.).
 import { useState } from 'react';
+// 🟢 BEGINNER: Import the global store so we can read the uploaded file / selected provider and write the job ID.
 import { useWorkflowStore } from '../../store/workflowStore';
+// 🟢 BEGINNER: Import the API client that talks to our Python backend.
 import { api } from '../../services/api';
+// 🟢 BEGINNER: Import the full-screen spinner shown while the pipeline runs.
 import { LoadingOverlay } from '../common/LoadingOverlay';
 
+// 🟢 BEGINNER: The most important action button in the app. When clicked, it:
+//  1. Uploads the file to the backend
+//  2. Starts the AI vision + design doc pipeline
+//  3. Polls until ready
+//  4. Advances the user to the Design Doc page
 export const AnalyseButton = () => {
-  const { 
-    setCurrentStep, 
-    uploadedFile, 
-    uploadedFileObject,
-    selectedProvider,
-    setDesignDocs,
-    setJobId,
-    isAnalyzing,
-    setIsAnalyzing
+  // 🟢 BEGINNER: Pull state and actions from the global Zustand store.
+  const {
+    setCurrentStep,         // 🟢 BEGINNER: Function to change the active wizard step (1, 2, or 3).
+    uploadedFile,           // 🟢 BEGINNER: File metadata (name, size) for display.
+    uploadedFileObject,     // 🟢 BEGINNER: The actual raw File object needed for the upload API.
+    selectedProvider,       // 🟢 BEGINNER: "aws" or "azure" — chosen in the CloudSelector.
+    setDesignDocs,          // 🟢 BEGINNER: Store the finished design document in global state.
+    setJobId,               // 🟢 BEGINNER: Remember the backend job ID so the next page can stream results.
+    setContextPack,         // 🟢 BEGINNER: Store the AI vision analysis result for ExtractedServices.
+    isAnalyzing,            // 🟢 BEGINNER: Boolean flag — true while the pipeline is running.
+    setIsAnalyzing,         // 🟢 BEGINNER: Toggle the analyzing flag on/off.
+    userPrompt,             // 🟢 BEGINNER: User's free-form requirements prompt.
+    setTerraformPrompts,    // 🟢 BEGINNER: Store generated Terraform prompts.
+    companyId,             // 🟢 BEGINNER: Current company ID for multi-tenant template scoping.
+    selectedTemplateId,    // 🟢 BEGINNER: Selected instruction template ID.
+    setDesignDocStreamStarted, // Mark that streaming was explicitly triggered
   } = useWorkflowStore();
 
+  // 🟢 BEGINNER: Local React state for the human-readable stage label shown in the loading overlay.
   const [pipelineStage, setPipelineStage] = useState('');
 
+  // 🟢 BEGINNER: The main async function triggered when the user clicks the button.
   const handleAnalyse = async () => {
+    // 🟢 BEGINNER: Guard clause — don't do anything if no file or provider is selected.
     if (!uploadedFileObject || !selectedProvider) return;
 
     setIsAnalyzing(true);
     setPipelineStage('Uploading...');
 
     try {
-      // Step 1: Start pipeline (uploads file + starts background processing - design doc only)
-      const jobResult = await api.startPipeline(uploadedFileObject, [selectedProvider]);
+      // 🟢 BEGINNER: Step 1 — Call the backend to upload the file and start the AI pipeline.
+      // api.startPipeline sends a POST request with the file, selected provider, user prompt, template_id, and company_id.
+      const jobResult = await api.startPipeline(
+        uploadedFileObject, 
+        [selectedProvider], 
+        userPrompt,
+        selectedTemplateId || '',
+        companyId || ''
+      );
       const jobId = jobResult.job_id;
       setJobId(jobId);
 
-      // Step 2: Poll until graph is built (design doc will stream on the next page)
+      // 🟢 BEGINNER: Step 2 — Poll the backend every few seconds until the job is done.
+      // waitForCompletion keeps asking "are you done yet?" and calls our callback with the latest stage name.
       const finalJob = await api.waitForCompletion(jobId, (stage) => {
+        // 🟢 BEGINNER: Map raw backend stage names to user-friendly text.
         const stageLabels: Record<string, string> = {
           'UPLOADED': 'Starting...',
-          'VISION_RUNNING': 'Analyzing diagram with AI vision...',
-          'GRAPH_BUILT': 'Graph ready — preparing streaming...',
-          'DESIGN_DOC_GENERATING': 'Generating design document...',
+          'FILE_DETECTED': 'Detecting file type...',
+          'PARSING': 'Parsing document...',
+          'IMAGE_ANALYZED': 'Analyzing images...',
+          'PROMPT_ANALYZED': 'Analyzing your requirements...',
+          'IMAGE_AND_PROMPT_ANALYZED': 'Vision + requirements done...',
+          'CONTEXT_FUSED': 'Fusing context from all inputs...',
+          'GRAPH_READY': 'Design doc streaming starts...',
+          'DESIGN_DOC_GENERATING': 'Writing design document...',
           'DESIGN_DOC_GENERATED': 'Design document ready!',
+          'TERRAFORM_PROMPTS_GENERATING': 'Generating Terraform prompts...',
+          'TERRAFORM_PROMPTS_GENERATED': 'Terraform prompts ready!',
+          'AGENTS_RUNNING': 'Vision + Requirements agents running...',
+          'COMPLETE': 'Complete!',
+          'DOCUMENT_PARSED': 'Document parsed...',
+          'DESIGN_DOC_FAILED': 'Design doc failed...',
+          'FAILED': 'Pipeline failed!',
         };
         setPipelineStage(stageLabels[stage] || stage);
       });
 
-      // Step 3: Store design documents if already available
+      // 🟢 BEGINNER: Step 3 — Save design docs if ready.
       if (finalJob.design_docs) {
         setDesignDocs(finalJob.design_docs);
       }
 
-      // Step 4: Move to design doc page (streaming will start automatically)
+      // 🟢 BEGINNER: Step 3b — Save Terraform prompts if ready.
+      if (finalJob.terraform_prompts) {
+        setTerraformPrompts(finalJob.terraform_prompts);
+      }
+
+      // 🟢 BEGINNER: Step 3c — Save the AI vision analysis result so ExtractedServices can display it.
+      if (finalJob.context_pack) {
+        setContextPack(finalJob.context_pack);
+      }
+
+      // 🟢 BEGINNER: Step 4 — Switch to step 2 (DesignDocPage). Mark stream as explicitly started.
+      setDesignDocStreamStarted(true);
       setCurrentStep(2);
 
     } catch (error) {
+      // 🟢 BEGINNER: If anything goes wrong (network error, backend crash), log it and alert the user.
       console.error('Pipeline failed:', error);
       alert('Pipeline failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
+      // 🟢 BEGINNER: Always run this block, success or failure. Turn off the spinner and clear the stage text.
       setIsAnalyzing(false);
       setPipelineStage('');
     }
@@ -87,6 +141,7 @@ export const AnalyseButton = () => {
 
   return (
     <>
+      {/* 🟢 BEGINNER: If the pipeline is running, render the full-screen LoadingOverlay on top of everything. */}
       {isAnalyzing && <LoadingOverlay message={pipelineStage} />}
       <button
         onClick={handleAnalyse}

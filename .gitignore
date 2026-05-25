@@ -2,6 +2,10 @@
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+secrets/
+credentials.json
 
 # ── Python ──────────────────────────────────────────────────
 __pycache__/
@@ -17,6 +21,8 @@ build/
 venv/
 env/
 .Python
+.mypy_cache/
+.ruff_cache/
 
 # ── Uploads & generated storage ────────────────────────────
 backend/storage/
@@ -24,10 +30,14 @@ backend/data/
 backend/uploads/
 backend/chroma_db/
 backend/archlens.db
+chroma_db/
+storage/job_store/
+*.db
 
 # ── Frontend build output ───────────────────────────────────
 frontend/dist/
 frontend/node_modules/
+frontend/.vite/
 
 # ── Logs ────────────────────────────────────────────────────
 *.log
@@ -43,3 +53,6 @@ desktop.ini
 .idea/
 *.swp
 *.swo
+.pytest_cache/
+.coverage
+htmlcov/

@@ -33,9 +33,23 @@ PATTERN: Singleton
 ================================================================================
 """
 
-from pydantic_settings import BaseSettings
+# 🟢 BEGINNER: Pydantic BaseSettings automatically reads configuration from:
+# 1. Environment variables (like GEMINI_API_KEY=xxx in your terminal)
+# 2. A .env file in the project root
+# 3. Default values defined right here in the code (lowest priority)
+from pathlib import Path
+from typing import List
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+# 🟢 BEGINNER: Backend-relative directory (one level up from this file → backend/).
+# We compute it here so things like CHROMA_PERSIST_DIR end up at an ABSOLUTE
+# path that doesn't depend on which folder you ran the server from.
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+
+
+# 🟢 BEGINNER: This class holds ALL configuration values for the entire backend.
+# Instead of reading os.environ everywhere, every file just imports "settings" from here.
 class Settings(BaseSettings):
     """Application settings — loaded from .env file and environment variables.
 
@@ -46,86 +60,161 @@ class Settings(BaseSettings):
     """
 
     # ── App Configuration ──────────────────────────────────────────────────
-    # APP_NAME appears in API root response and startup logs.
-    APP_NAME: str = "AWS Architecture AI"
-    DEBUG: bool = False
-    LOG_LEVEL: str = "INFO"
+    APP_NAME: str = "AWS Architecture AI"   # 🟢 BEGINNER: Displayed in API root response and logs.
+    ENVIRONMENT: str = "development"        # development | staging | production
+    DEBUG: bool = False                     # 🟢 BEGINNER: If True, shows detailed error messages and enables /docs.
+    LOG_LEVEL: str = "INFO"                 # 🟢 BEGINNER: Controls how much the server logs (DEBUG, INFO, WARNING, ERROR).
 
     # ── Server Configuration ────────────────────────────────────────────────
-    # BACKEND_PORT is where uvicorn listens.
-    # FRONTEND_PORT is used for CORS origin generation.
-    BACKEND_PORT: int = 8000
-    FRONTEND_PORT: int = 3000
+    BACKEND_PORT: int = 8000                # 🟢 BEGINNER: The port uvicorn listens on.
+    FRONTEND_PORT: int = 3000               # 🟢 BEGINNER: Used to generate the CORS allowed origin.
 
     # ── CORS Configuration ───────────────────────────────────────────────
-    # ALLOWED_ORIGINS must include every domain that serves the React frontend.
-    # Comma-separated list. In production, list exact origins, not "*".
-    CORS_ORIGIN: str = "http://localhost:3000"
-    ALLOWED_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
+    CORS_ORIGIN: str = "http://localhost:3000"                            # 🟢 BEGINNER: Default frontend URL.
+    ALLOWED_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"  # 🟢 BEGINNER: Comma-separated list of domains allowed to call this API.
 
     # ── AI Model Keys (REQUIRED for the app to work) ─────────────────────
-    # GEMINI_API_KEY   → Google AI Studio API key (free tier available)
-    # AWS credentials  → needed for Bedrock Claude access (not free)
-    GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-2.5-flash"
-    GEMINI_RPM_LIMIT: int = 15          # Rate limit safety guard
-    GEMINI_VISION_MODEL: str = "gemini-2.5-pro"    # Diagram analysis
-    GEMINI_TEXT_MODEL: str = "gemini-2.5-flash"     # Fallback text tasks
+    GEMINI_API_KEY: str = ""                            # 🟢 BEGINNER: Your Google AI Studio API key. Free tier available.
+    GEMINI_MODEL: str = "gemini-2.5-flash"              # 🟢 BEGINNER: Default Gemini model for text tasks.
+    GEMINI_RPM_LIMIT: int = 15                          # 🟢 BEGINNER: Requests-per-minute safety guard to avoid rate limits.
+    GEMINI_VISION_MODEL: str = "gemini-2.5-pro"         # 🟢 BEGINNER: Stronger model used for analyzing architecture diagrams.
+    GEMINI_TEXT_MODEL: str = "gemini-2.5-flash"         # 🟢 BEGINNER: Faster/cheaper fallback for text-only tasks.
 
     # ── AWS Configuration ─────────────────────────────────────────────────
-    # These credentials need Bedrock InvokeModel permission.
-    # Model ID format: us.anthropic.claude-sonnet-4-5-20250929-v1:0
-    # The "us." prefix means the model is in the US region partition.
-    AWS_ACCESS_KEY_ID: str = ""
-    AWS_SECRET_ACCESS_KEY: str = ""
-    AWS_DEFAULT_REGION: str = "us-east-1"
-    AWS_BEDROCK_MODEL: str = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
-    AWS_TEXTRACT_ENABLED: bool = True
+    AWS_ACCESS_KEY_ID: str = ""                                                       # 🟢 BEGINNER: AWS IAM key. Needs permission to call Bedrock InvokeModel.
+    AWS_SECRET_ACCESS_KEY: str = ""                                                   # 🟢 BEGINNER: Secret part of the AWS key pair.
+    AWS_DEFAULT_REGION: str = "us-east-1"                                             # 🟢 BEGINNER: AWS region where Bedrock is accessed.
+    AWS_BEDROCK_MODEL: str = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"           # 🟢 BEGINNER: Claude model ID on Bedrock (for final generation).
+    AWS_BEDROCK_HAIKU_MODEL: str = "us.anthropic.claude-haiku-4-5-20251001-v1:0"      # 🟢 BEGINNER: Haiku model ID on Bedrock (for context compression).
+    AWS_TEXTRACT_ENABLED: bool = False                                                # 🟢 BEGINNER: Reserved flag for future AWS Textract OCR; OCR currently runs through Gemini Vision.
 
     # ── Storage Configuration ───────────────────────────────────────────
-    # All file paths are relative to backend/ working directory.
-    # In production, switch STORAGE_TYPE to "s3" and set bucket name.
-    STORAGE_TYPE: str = "local"
-    STORAGE_BASE_PATH: str = "./data"
-    UPLOAD_DIR: str = "storage/uploads"       # Raw diagram uploads
-    PROCESSED_DIR: str = "storage/processed"  # OCR / vision outputs
-    OUTPUT_DIR: str = "storage/outputs"       # Generated docs / code
+    STORAGE_TYPE: str = "local"               # 🟢 BEGINNER: "local" saves files to disk; "s3" would use AWS S3 in production.
+    STORAGE_BASE_PATH: str = "./data"         # 🟢 BEGINNER: Root folder for all saved data.
+    UPLOAD_DIR: str = "storage/uploads"       # 🟢 BEGINNER: Where uploaded diagram images are saved.
+    PROCESSED_DIR: str = "storage/processed"  # 🟢 BEGINNER: Where OCR/vision output files go.
+    OUTPUT_DIR: str = "storage/outputs"       # 🟢 BEGINNER: Where generated design docs and Terraform code are saved.
 
     # ── Image Processing ─────────────────────────────────────────────────
-    # MAX_IMAGE_SIZE_MB prevents users from uploading multi-gigabyte scans.
-    # TILE_SIZE / TILE_OVERLAP are for future multi-tile vision analysis.
-    MAX_IMAGE_SIZE_MB: int = 50
-    TILE_SIZE: int = 1024
-    TILE_OVERLAP: int = 128
+    MAX_IMAGE_SIZE_MB: int = 50  # 🟢 BEGINNER: Rejects uploads larger than 50 MB.
+    TILE_SIZE: int = 1024        # 🟢 BEGINNER: For future multi-tile image analysis (not used yet).
+    TILE_OVERLAP: int = 128      # 🟢 BEGINNER: Overlap between tiles to avoid cutting off objects at edges.
 
     # ── Confidence Thresholds ────────────────────────────────────────────
-    # Vision service uses these to flag uncertain component detections.
-    # < LOW  → flagged as "needs review"
-    # > HIGH → auto-accepted without human review
-    CONFIDENCE_THRESHOLD_LOW: float = 0.65
-    CONFIDENCE_THRESHOLD_HIGH: float = 0.85
+    CONFIDENCE_THRESHOLD_LOW: float = 0.65   # 🟢 BEGINNER: Below this, AI detections are flagged as "needs review".
+    CONFIDENCE_THRESHOLD_HIGH: float = 0.85  # 🟢 BEGINNER: Above this, detections are auto-accepted.
 
     # ── Database ───────────────────────────────────────────────────────────
-    # Currently unused (jobs stored in-memory). Future: aiosqlite or PostgreSQL.
-    DATABASE_PATH: str = "archlens.db"
+    DATABASE_PATH: str = "archlens.db"  # 🟢 BEGINNER: SQLite file path. Currently unused (jobs stored in JobStore).
 
     # ── RAG (Retrieval-Augmented Generation) Configuration ────────────────
-    # ChromaDB stores embeddings of AWS/Azure documentation.
-    # EMBEDDING_MODEL converts text → vectors for semantic search.
-    CHROMA_PERSIST_DIR: str = "./chroma_db"
-    EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
+    # 🟢 BEGINNER: Qdrant is the vector database that stores embeddings for the RAG chat feature.
+    QDRANT_URL: str = "http://localhost:6333"
+    RAG_COLLECTION_NAME: str = "infra_documents"
+
+    # 🟢 BEGINNER: bge-small-en-v1.5: 33M params, 384 dim — 10x faster than BGE-M3, 92% quality.
+    # Perfect for English documents (resumes, architecture docs, PDFs).
+    EMBEDDING_MODEL: str = "BAAI/bge-small-en-v1.5"
+    RERANKER_MODEL: str = "BAAI/bge-reranker-v2-m3"
+
+    # 🟢 BEGINNER: Larger chunks (1024 chars ≈ 200 words) give Haiku more context per retrieved section.
+    # Overlap of 100 chars ensures sentences at chunk boundaries aren't lost.
+    RAG_CHUNK_SIZE: int = 1024
+    RAG_CHUNK_OVERLAP: int = 100
+
+    # ── RAG retrieval tuning (hybrid search) ─────────────────────────────
+    # 🟢 BEGINNER: How many candidates each branch (dense + sparse) returns
+    # before Qdrant fuses them with Reciprocal Rank Fusion server-side.
+    RAG_PREFETCH_LIMIT: int = 25
+    # 🟢 BEGINNER: Final number of candidates the LLM (or reranker) sees.
+    RAG_TOP_K: int = 5
+    # 🟢 BEGINNER: Toggle the BGE cross-encoder reranker. Accurate but slow
+    # (~150-300 ms on CPU). Set to false for sub-second responses if RRF alone is enough.
+    RAG_USE_RERANKER: bool = True
+    # 🟢 BEGINNER: BM25 model name from fastembed. The default Qdrant/bm25 is
+    # ~5 MB, runs entirely on CPU, and encodes a query in ~1 ms.
+    RAG_BM25_MODEL: str = "Qdrant/bm25"
+
+    # LLM semantic cache. L1 exact cache is safe for all tasks; L2 semantic
+    # matching is intentionally limited to lower-risk tasks so design docs and
+    # Terraform prompts do not leak assumptions across similar architectures.
+    SEMANTIC_CACHE_ENABLED: bool = True
+    SEMANTIC_CACHE_L1_MAX_SIZE: int = 500
+    SEMANTIC_CACHE_L2_ENABLED: bool = True
+    SEMANTIC_CACHE_L2_SCORE_THRESHOLD: float = 0.94
+    SEMANTIC_CACHE_L2_TASK_TYPES: str = "template_compression,image_compression,prompt_compression,prompt_suggestions,rag_synthesis,terraform_chat,prompt_analysis,component_extraction"
+    SEMANTIC_CACHE_VERSION: str = "v2"
+
+    # 🟢 BEGINNER: Legacy ChromaDB store. Resolved to an ABSOLUTE path under backend/
+    # so it points to the same folder no matter where you run python from.
+    CHROMA_PERSIST_DIR: str = str(BACKEND_DIR / "chroma_db")
 
     # ── LangChain ────────────────────────────────────────────────────────
-    # If True, LangChain prints every LLM call to stdout (very verbose).
-    LANGCHAIN_VERBOSE: bool = False
+    LANGCHAIN_VERBOSE: bool = False  # 🟢 BEGINNER: If True, prints every LLM call to the server console (very noisy).
 
-    class Config:
-        # Tell Pydantic to load values from backend/.env file
-        env_file = ".env"
-        # Keys in .env must match case exactly (e.g. GEMINI_API_KEY, not gemini_api_key)
-        case_sensitive = True
+    # ── LangSmith Observability ──────────────────────────────────────────
+    LANGSMITH_TRACING: bool = True
+    LANGSMITH_ENDPOINT: str = "https://api.smith.langchain.com/"
+    LANGSMITH_API_KEY: str = ""
+    LANGSMITH_PROJECT: str = "Aws_agent"
+
+    # ── Client Profile & Policy Engine ───────────────────────────────────
+    ENABLE_REPAIR_LOOP: bool = True
+    MAX_REPAIR_ATTEMPTS: int = 1
+    DEFAULT_CLIENT_PROFILE: str = "default"
+
+    # ── Auth (optional API key) ──────────────────────────────────────────
+    # 🟢 BEGINNER: If set, every API route requires header `X-API-Key: <value>`.
+    # Leave empty in development; STRONGLY recommended for production deployments.
+    API_KEY: str = ""
+
+    # ── LLM Gateway / Cost Control ───────────────────────────────────────
+    DAILY_BUDGET_USD: float = 5.00        # 🟢 BEGINNER: Hard daily spend cap across all LLM calls. Resets at midnight.
+
+    # ── Job lifecycle ────────────────────────────────────────────────────
+    JOB_TTL_HOURS: int = 168              # 🟢 BEGINNER: Purge jobs older than this (default = 1 week).
+    PIPELINE_TIMEOUT_SECONDS: int = 1800  # 🟢 BEGINNER: Hard cap on a pipeline run (default = 30 min).
+
+    @property
+    def allowed_origins_list(self) -> List[str]:
+        """🟢 BEGINNER: Helper that returns ALLOWED_ORIGINS as a clean Python list."""
+        return [o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
+
+    @property
+    def is_production(self) -> bool:
+        return self.ENVIRONMENT.strip().lower() in {"prod", "production"}
+
+    def validate_production_ready(self) -> None:
+        """Fail fast when production is configured unsafely."""
+        if not self.is_production:
+            return
+
+        errors: list[str] = []
+        if self.DEBUG:
+            errors.append("DEBUG must be false in production")
+        if not self.API_KEY or len(self.API_KEY) < 32:
+            errors.append("API_KEY must be set to a 32+ character secret in production")
+        if not self.GEMINI_API_KEY or self.GEMINI_API_KEY.startswith("your_"):
+            errors.append("GEMINI_API_KEY must be configured in production")
+        if not self.AWS_ACCESS_KEY_ID or self.AWS_ACCESS_KEY_ID.startswith("your_"):
+            errors.append("AWS_ACCESS_KEY_ID must be configured in production")
+        if not self.AWS_SECRET_ACCESS_KEY or self.AWS_SECRET_ACCESS_KEY.startswith("your_"):
+            errors.append("AWS_SECRET_ACCESS_KEY must be configured in production")
+        if "*" in self.allowed_origins_list:
+            errors.append("ALLOWED_ORIGINS must not contain '*' in production")
+
+        if errors:
+            raise RuntimeError("Production configuration is unsafe: " + "; ".join(errors))
+
+    # 🟢 BEGINNER: Pydantic v2 way to configure a Settings class. The old
+    # `class Config:` style still works but emits a deprecation warning.
+    model_config = SettingsConfigDict(
+        env_file=".env",       # 🟢 BEGINNER: Load values from a .env file in the backend folder.
+        case_sensitive=True,    # 🟢 BEGINNER: Variable names in .env must match EXACT case.
+        extra="ignore",         # 🟢 BEGINNER: Don't crash if .env contains keys we don't know about.
+    )
 
 
-# ── Singleton export ───────────────────────────────────────────────────────
-# Every other module imports this single instance.
+# 🟢 BEGINNER: Create a single global instance. Every other module imports this "settings" object.
+# It's a "singleton" — one shared instance used everywhere.
 settings = Settings()

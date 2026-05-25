@@ -15,10 +15,18 @@
  *   • App.tsx         → rendered as the left sidebar
  */
 
+// 🟢 BEGINNER: Import the global Zustand store to read the current wizard step list and active step.
 import { useWorkflowStore } from '../../store/workflowStore';
 
+// 🟢 BEGINNER: Sidebar component that shows the 3-step wizard progress (Upload → Design Doc → Terraform).
+// It uses a vertical line, colored circles, and text labels to indicate where the user is.
 export const WorkflowStepper = () => {
-  const { steps, currentStep } = useWorkflowStore();
+  const { steps, currentStep, designDocs, selectedProvider, streamedJobId, jobId } = useWorkflowStore();
+
+  // Determine if design doc is complete (has cached content)
+  const designDocComplete = !!(designDocs[selectedProvider]?.content);
+  // Determine if streaming has been done for this job
+  const hasStreamed = streamedJobId === jobId && !!jobId;
 
   return (
     <aside style={{ width: '220px', backgroundColor: 'white', borderRight: '0.5px solid rgba(0,0,0,0.12)', padding: '12px 0', overflowY: 'auto' }}>
@@ -26,15 +34,14 @@ export const WorkflowStepper = () => {
         <span style={{ fontSize: '10.5px', textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9b9b9b' }}>WORKFLOW</span>
       </div>
       <div style={{ position: 'relative' }}>
-        {/* Vertical connector line */}
         <div style={{ position: 'absolute', left: '11px', top: '11px', bottom: '11px', width: '0.5px', backgroundColor: '#E5E7EB', zIndex: '-1' }} />
         <div
-          style={{ 
-            position: 'absolute', 
-            left: '11px', 
-            top: '11px', 
-            width: '0.5px', 
-            backgroundColor: '#5B4EE8', 
+          style={{
+            position: 'absolute',
+            left: '11px',
+            top: '11px',
+            width: '0.5px',
+            backgroundColor: '#5B4EE8',
             transition: 'all 0.7s ease-out',
             zIndex: '-1',
             height: `${((currentStep - 1) / (steps.length - 1)) * 100}%`
@@ -42,10 +49,21 @@ export const WorkflowStepper = () => {
         />
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {steps.map((step, index: number) => {
+          {steps.map((step) => {
             const isActive = step.id === currentStep;
             const isCompleted = step.id < currentStep;
-            const isPending = step.id > currentStep;
+
+            // Dynamic sub-label for Design Doc step
+            let subLabel = '';
+            if (step.id === 2 && isActive) {
+              if (designDocComplete) {
+                subLabel = 'Complete';
+              } else if (hasStreamed) {
+                subLabel = 'Streaming...';
+              } else {
+                subLabel = 'In progress...';
+              }
+            }
 
             return (
               <div
@@ -58,7 +76,6 @@ export const WorkflowStepper = () => {
                   transform: isActive ? 'translateX(4px)' : 'translateX(0)'
                 }}
               >
-                {/* Step indicator */}
                 <div style={{ position: 'relative' }}>
                   <div
                     style={{
@@ -72,19 +89,15 @@ export const WorkflowStepper = () => {
                       fontWeight: 600,
                       transition: 'all 0.5s',
                       backgroundColor: isActive
-                        ? '#5B4EE8'
+                        ? (designDocComplete && step.id === 2 ? '#10B981' : '#5B4EE8')
                         : isCompleted
                         ? '#10B981'
                         : '#F3F4F6',
-                      color: isActive
-                        ? 'white'
-                        : isCompleted
-                        ? 'white'
-                        : '#9CA3AF',
+                      color: (isActive || isCompleted) ? 'white' : '#9CA3AF',
                       transform: isActive ? 'scale(1.1)' : 'scale(1)'
                     }}
                   >
-                    {isCompleted ? (
+                    {(isCompleted || (isActive && designDocComplete && step.id === 2)) ? (
                       <svg style={{ width: '14px', height: '14px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
@@ -94,7 +107,6 @@ export const WorkflowStepper = () => {
                   </div>
                 </div>
 
-                {/* Label */}
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <span
                     style={{
@@ -107,8 +119,12 @@ export const WorkflowStepper = () => {
                     {step.label}
                   </span>
                   {isActive && (
-                    <span style={{ fontSize: '11px', color: '#5B4EE8', fontWeight: 500 }}>
-                      In progress...
+                    <span style={{
+                      fontSize: '11px',
+                      fontWeight: 500,
+                      color: designDocComplete && step.id === 2 ? '#10B981' : '#5B4EE8',
+                    }}>
+                      {subLabel || 'In progress...'}
                     </span>
                   )}
                   {isCompleted && (

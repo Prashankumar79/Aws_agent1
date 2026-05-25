@@ -1,7 +1,22 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import DOMPurify from 'dompurify';
 import { useWorkflowStore } from '../store/workflowStore';
 import { useTerraformChatStore, type ChatMessage, type AIModel, type GeneratedFile } from '../store/terraformChatStore';
 import { api } from '../services/api';
+import { PromptRefinerModal } from '../components/terraform/PromptRefinerModal';
+
+/* 🟢 BEGINNER: DOMPurify config that is safe for our syntax-highlighter output.
+   We allow only <span>, <pre>, <br> with the `style` attribute (for inline colors).
+   This blocks <script>, <iframe>, on*= event handlers, and javascript: URLs even
+   if a future bug in highlightHCL accidentally lets one slip through. */
+function safeHighlight(html: string): string {
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ['span', 'pre', 'br', 'code'],
+    ALLOWED_ATTR: ['style'],
+    KEEP_CONTENT: true,
+    RETURN_TRUSTED_TYPE: false,
+  }) as unknown as string;
+}
 
 /* ── Robust copy that works even when navigator.clipboard is unavailable ── */
 async function copyToClipboard(text: string): Promise<void> {
@@ -38,12 +53,14 @@ function CopyButton({ text, style, children }: { text: string; style?: React.CSS
 /* ══════════════════════════════════════════════════════════════
    Utility — Parse AI response into files + commands
    ══════════════════════════════════════════════════════════════ */
+// 🟢 BEGINNER: Parse the AI's response text into structured pieces:
+// prose (explanation text), files (HCL code blocks), and commands (bash usage).
 function parseResponse(text: string) {
   const files: GeneratedFile[] = [];
   let commands = '';
   let prose = '';
 
-  // Extract prose before first file marker
+  // 🟢 BEGINNER: Extract the prose explanation that comes before the first file marker.
   const firstFileMatch = text.match(/\*\*\d+\.\s+[^*]+\*\*/);
   if (firstFileMatch) {
     prose = text.slice(0, firstFileMatch.index).trim();
@@ -51,7 +68,7 @@ function parseResponse(text: string) {
     prose = text;
   }
 
-  // Extract HCL files: **N. filename.tf** + ```hcl ... ```
+  // 🟢 BEGINNER: Find all HCL code blocks formatted as **N. filename.tf** followed by ```hcl ... ```
   const fileRegex = /\*\*(\d+)\.\s+([^*]+)\*\*\s*```hcl\s*([\s\S]*?)```/g;
   let m;
   while ((m = fileRegex.exec(text)) !== null) {
@@ -62,7 +79,7 @@ function parseResponse(text: string) {
     });
   }
 
-  // Extract Usage Commands: **Usage Commands** + ```bash ... ```
+  // 🟢 BEGINNER: Find the Usage Commands section (bash commands the user can run).
   const cmdMatch = text.match(/\*\*Usage Commands\*\*\s*```bash\s*([\s\S]*?)```/);
   if (cmdMatch) {
     commands = cmdMatch[1].trim();
@@ -172,6 +189,8 @@ export const TerraformChatPage = () => {
     showModelDropdown,
     contextVisible,
     diagramContext,
+    conversations,
+    activeConversationId,
     setMessages,
     addMessage,
     updateLastMessage,
@@ -183,11 +202,17 @@ export const TerraformChatPage = () => {
     setContextVisible,
     setDiagramContext,
     reset,
+    saveConversation,
+    loadConversation,
+    deleteConversation,
   } = useTerraformChatStore();
 
   const [input, setInput] = useState('');
+  const [showRefinerModal, setShowRefinerModal] = useState(false);
 
   /* ── Pick up a pending prompt from DesignDocPage navigation ── */
+  // 🟢 BEGINNER: When the user clicks a "Generate Terraform" prompt card on DesignDocPage,
+  // that page stores the prompt text in window.__pendingTfPrompt. This effect picks it up.
   const hasPendingRef = useRef(false);
   useEffect(() => {
     if (hasPendingRef.current) return;
@@ -205,13 +230,14 @@ export const TerraformChatPage = () => {
   const modelDropdownRef = useRef<HTMLDivElement>(null);
 
   /* ── Build diagram context on mount ── */
+  // 🟢 BEGINNER: Extract cloud service names (EC2, S3, RDS, etc.) from the design document
+  // so the AI chat knows what resources were detected in the uploaded diagram.
   const hasSetContextRef = useRef(false);
   useEffect(() => {
     if (hasSetContextRef.current) return;
     const doc = designDocs?.[selectedProvider];
     if (doc) {
       hasSetContextRef.current = true;
-      // Try to infer resources from design doc content
       const content = doc.content || '';
       const resources: { name: string; service: string }[] = [];
       const lines = content.split('\n');
@@ -234,6 +260,7 @@ export const TerraformChatPage = () => {
   }, [designDocs, selectedProvider, setDiagramContext]);
 
   /* ── Auto-scroll chat ── */
+  // 🟢 BEGINNER: Whenever messages change, scroll to the bottom if the user is already near the bottom.
   useEffect(() => {
     if (messagesEndRef.current && chatScrollRef.current) {
       const el = chatScrollRef.current;
@@ -264,9 +291,12 @@ export const TerraformChatPage = () => {
   }, [input]);
 
   /* ── Send message ── */
+  // 🟢 BEGINNER: Called when the user presses Enter or clicks the Send button.
+  // It adds the user's message to the chat, streams the AI response, and parses generated files.
   const handleSend = useCallback(async () => {
     if (!input.trim() || isStreaming) return;
 
+    // 🟢 BEGINNER: Create the user message object and add it to the chat store.
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
@@ -277,6 +307,7 @@ export const TerraformChatPage = () => {
     setInput('');
     setIsStreaming(true);
 
+    // 🟢 BEGINNER: Create an empty assistant message that will be filled in as the AI streams its response.
     const aiMsg: ChatMessage = {
       id: (Date.now() + 1).toString(),
       role: 'assistant',
@@ -286,22 +317,24 @@ export const TerraformChatPage = () => {
     };
     addMessage(aiMsg);
 
+    // 🟢 BEGINNER: Build the message array to send to the backend (all previous messages + the new user message).
     const allMsgs = [...messages, userMsg].map((m) => ({
       role: m.role,
       content: m.content,
     }));
 
+    // 🟢 BEGINNER: Stream the AI response chunk by chunk using our api client.
     let text = '';
     try {
       for await (const chunk of api.streamTerraformChat(allMsgs, selectedModel, jobId)) {
         if ('done' in chunk && chunk.done) break;
         if ('text' in chunk) {
           text += chunk.text;
-          updateLastMessage(text);
+          updateLastMessage(text);  // 🟢 BEGINNER: Updates the last assistant message in real time (typewriter effect).
         }
       }
 
-      // Parse final response
+      // 🟢 BEGINNER: After streaming is done, parse the full response to extract HCL files and bash commands.
       const parsed = parseResponse(text);
       if (parsed.files.length > 0) {
         setGeneratedFiles(parsed.files);
@@ -313,6 +346,8 @@ export const TerraformChatPage = () => {
       updateLastMessage(text);
     } finally {
       setIsStreaming(false);
+      // Auto-save conversation after each response completes
+      setTimeout(() => saveConversation(), 100);
     }
   }, [input, isStreaming, messages, selectedModel, jobId, addMessage, setIsStreaming, updateLastMessage, setGeneratedFiles, setActiveFile]);
 
@@ -426,27 +461,48 @@ export const TerraformChatPage = () => {
           </span>
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px' }}>
-          {messages.filter((m) => m.role === 'user').map((m) => (
+          {conversations.map((conv) => (
             <div
-              key={m.id}
+              key={conv.id}
+              onClick={() => loadConversation(conv.id)}
               style={{
                 padding: '8px 10px',
                 borderRadius: '6px',
                 fontSize: '13px',
-                color: '#1a1a1a',
+                color: activeConversationId === conv.id ? '#5B4EE8' : '#1a1a1a',
+                backgroundColor: activeConversationId === conv.id ? '#EEEDFE' : 'transparent',
                 cursor: 'pointer',
                 marginBottom: '2px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
               }}
               onMouseEnter={(e) => {
-                (e.currentTarget as HTMLDivElement).style.backgroundColor = '#F5F3EE';
+                if (activeConversationId !== conv.id)
+                  (e.currentTarget as HTMLDivElement).style.backgroundColor = '#F5F3EE';
               }}
               onMouseLeave={(e) => {
-                (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent';
+                if (activeConversationId !== conv.id)
+                  (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent';
               }}
             >
-              {m.content.slice(0, 30)}{m.content.length > 30 ? '...' : ''}
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                {conv.title}
+              </span>
+              <button
+                onClick={(e) => { e.stopPropagation(); deleteConversation(conv.id); }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9b9b9b', fontSize: '12px', padding: '2px 4px' }}
+                title="Delete"
+              >
+                ×
+              </button>
             </div>
           ))}
+          {conversations.length === 0 && (
+            <div style={{ padding: '8px 10px', fontSize: '12px', color: '#9b9b9b' }}>
+              No conversations yet
+            </div>
+          )}
         </div>
 
         {/* Files Generated */}
@@ -594,22 +650,6 @@ export const TerraformChatPage = () => {
                 </div>
               )}
             </div>
-
-            <button style={{
-              padding: '5px 10px',
-              borderRadius: '20px',
-              border: '0.5px solid rgba(0,0,0,0.12)',
-              background: 'white',
-              fontSize: '12px',
-              color: '#6b6b6b',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-            }}>
-              <i className="ti ti-share" style={{ fontSize: '13px' }} />
-              Share
-            </button>
           </div>
         </div>
 
@@ -655,9 +695,21 @@ export const TerraformChatPage = () => {
                     </span>
                   </div>
 
-                  {/* Prompt cards (show first 6) */}
+                  {/* Prompt cards (show first 6, sorted by priority) */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '10px' }}>
-                    {terraformPrompts.slice(0, contextVisible ? terraformPrompts.length : 6).map((p, i) => (
+                    {[...terraformPrompts]
+                      .sort((a, b) => {
+                        const pOrder: Record<string, number> = { P0: 0, P1: 1, P2: 2 };
+                        return (pOrder[(a as any).priority || 'P1'] ?? 1) - (pOrder[(b as any).priority || 'P1'] ?? 1);
+                      })
+                      .slice(0, contextVisible ? terraformPrompts.length : 6).map((p, i) => {
+                      const pColors: Record<string, { bg: string; text: string }> = {
+                        P0: { bg: '#FEE2E2', text: '#991B1B' },
+                        P1: { bg: '#FEF3C7', text: '#92400E' },
+                        P2: { bg: '#E0E7FF', text: '#3730A3' },
+                      };
+                      const pC = pColors[(p as any).priority || 'P1'] || pColors.P1;
+                      return (
                       <button
                         key={i}
                         onClick={() => { setInput(p.prompt); setTimeout(() => textareaRef.current?.focus(), 50); }}
@@ -700,13 +752,34 @@ export const TerraformChatPage = () => {
                             }}>
                               {p.category}
                             </span>
+                            {/* Priority badge */}
+                            {(p as any).priority && (
+                              <span style={{
+                                fontSize: '8px', fontWeight: 800, textTransform: 'uppercase',
+                                letterSpacing: '0.08em', padding: '1px 6px', borderRadius: '10px',
+                                backgroundColor: pC.bg, color: pC.text,
+                              }}>
+                                {(p as any).priority}
+                              </span>
+                            )}
+                            {/* Resource count */}
+                            {(p as any).estimated_resources > 0 && (
+                              <span style={{
+                                fontSize: '9px', fontWeight: 600, color: '#9CA3AF', marginLeft: 'auto',
+                                display: 'inline-flex', alignItems: 'center', gap: '2px',
+                              }}>
+                                <i className="ti ti-stack-2" style={{ fontSize: '10px' }} />
+                                ~{(p as any).estimated_resources}
+                              </span>
+                            )}
                           </div>
                           <span style={{ flex: 1, fontSize: '12.5px', color: '#374151' }}>
-                            {p.prompt.length > 100 ? p.prompt.slice(0, 100) + '...' : p.prompt}
+                            {p.prompt.length > 120 ? p.prompt.slice(0, 120) + '...' : p.prompt}
                           </span>
                         </div>
                       </button>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   {/* Toggle */}
@@ -883,7 +956,7 @@ export const TerraformChatPage = () => {
                                   <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)' }}>hcl</span>
                                 </div>
                                 <pre style={{ margin: 0, padding: '12px', fontSize: '12px', lineHeight: 1.75, overflowX: 'auto', color: 'white', fontFamily: 'monospace' }}
-                                  dangerouslySetInnerHTML={{ __html: highlightHCL(preview) }}
+                                  dangerouslySetInnerHTML={{ __html: safeHighlight(highlightHCL(preview)) }}
                                 />
                                 {hasMore && (
                                   <div
@@ -913,7 +986,7 @@ export const TerraformChatPage = () => {
                                 <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)' }}>bash</span>
                               </div>
                               <pre style={{ margin: 0, padding: '12px', fontSize: '12px', lineHeight: 1.75, color: 'white', fontFamily: 'monospace' }}
-                                dangerouslySetInnerHTML={{ __html: highlightBash(parsed.commands) }}
+                                dangerouslySetInnerHTML={{ __html: safeHighlight(highlightBash(parsed.commands)) }}
                               />
                             </div>
                           </div>
@@ -930,13 +1003,46 @@ export const TerraformChatPage = () => {
         </div>
 
         {/* Input bar */}
-        <div style={{ backgroundColor: 'white', borderTop: '0.5px solid rgba(0,0,0,0.12)', padding: '12px 16px', flexShrink: 0 }}>
-          <div style={{
-            border: '0.5px solid rgba(0,0,0,0.12)',
-            borderRadius: '12px',
-            backgroundColor: 'white',
-            padding: '10px 14px',
-          }}>
+        <div style={{ backgroundColor: 'white', borderTop: '0.5px solid rgba(0,0,0,0.12)', padding: '0 20px 16px' }}>
+          {/* Bulb icon for prompt refiner */}
+          <div style={{ marginBottom: '8px' }}>
+            <button
+              onClick={() => setShowRefinerModal(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                borderRadius: '20px',
+                border: '0.5px solid rgba(91, 78, 232, 0.3)',
+                backgroundColor: '#F5F3EE',
+                color: '#5B4EE8',
+                fontSize: '12px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#EEEDFE';
+                e.currentTarget.style.borderColor = '#5B4EE8';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#F5F3EE';
+                e.currentTarget.style.borderColor = 'rgba(91, 78, 232, 0.3)';
+              }}
+            >
+              <i className="ti ti-lightbulb" style={{ fontSize: '14px' }} />
+              Refine your prompt with AI
+            </button>
+          </div>
+
+          <div
+            style={{
+              border: '0.5px solid rgba(0,0,0,0.12)',
+              borderRadius: '12px',
+              backgroundColor: 'white',
+              padding: '10px 14px',
+            }}>
             <textarea
               ref={textareaRef}
               value={input}
@@ -1135,7 +1241,7 @@ export const TerraformChatPage = () => {
                   }}>
                     {i + 1}
                   </span>
-                  <span dangerouslySetInnerHTML={{ __html: highlightHCL(line) }} />
+                  <span dangerouslySetInnerHTML={{ __html: safeHighlight(highlightHCL(line)) }} />
                 </div>
               ))}
             </div>
@@ -1233,6 +1339,18 @@ export const TerraformChatPage = () => {
           </button>
         </div>
       )}
+
+      {/* Prompt Refiner Modal */}
+      <PromptRefinerModal
+        isOpen={showRefinerModal}
+        onClose={() => setShowRefinerModal(false)}
+        onSelect={(suggestion) => {
+          setInput(suggestion);
+          setTimeout(() => textareaRef.current?.focus(), 50);
+        }}
+        cloudProvider={selectedProvider}
+        detectedResources={diagramContext?.detectedResources.map((r) => r.service) || []}
+      />
     </div>
   );
 };

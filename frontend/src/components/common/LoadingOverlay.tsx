@@ -1,45 +1,52 @@
 /**
- * LoadingOverlay — full-screen spinner with pipeline stage message.
- *
- * PURPOSE:
- *   Blocks the UI while the backend pipeline runs (vision analysis,
- *   graph building, design doc generation). Shows a rotating spinner
- *   and the current pipeline stage label passed from AnalyseButton.
- *
- * CONNECTIONS:
- *   • AnalyseButton.tsx → passes the current pipelineStage string
+ * LoadingOverlay — full-screen spinner shown while the pipeline runs.
+ * Used only by AnalyseButton.tsx.
  */
-
 interface LoadingOverlayProps {
   message?: string;
 }
 
 export const LoadingOverlay = ({ message }: LoadingOverlayProps) => {
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm animate-fade-in">
-      <div className="relative">
-        <div className="w-16 h-16 rounded-full border-4 border-orange-100 border-t-orange-500 animate-spin" />
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 50,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      backgroundColor: 'rgba(255,255,255,0.85)',
+      backdropFilter: 'blur(4px)',
+    }}>
+      {/* Spinner */}
+      <div style={{ position: 'relative', width: '56px', height: '56px', marginBottom: '24px' }}>
+        <div style={{
+          width: '56px', height: '56px', borderRadius: '50%',
+          border: '3px solid #EEEDFE',
+          borderTopColor: '#5B4EE8',
+          animation: 'spin 0.8s linear infinite',
+        }} />
       </div>
-      <p className="mt-6 text-lg font-medium text-gray-700">
+
+      <p style={{ fontSize: '16px', fontWeight: 500, color: '#1a1a1a', marginBottom: '6px' }}>
         {message || 'Analysing your architecture...'}
       </p>
-      <p className="mt-2 text-sm text-gray-400">
-        This may take a few minutes for vision analysis and design document generation
+      <p style={{ fontSize: '13px', color: '#6b6b6b', marginBottom: '24px' }}>
+        This may take 1–3 minutes depending on diagram complexity
       </p>
 
-      {/* Pipeline steps */}
-      <div className="mt-8 flex items-center gap-3">
-        {['Vision', 'Graph', 'RAG', 'Generate'].map((step, i) => (
-          <div key={step} className="flex items-center gap-2">
-            <span className="px-3 py-1 rounded-full text-xs font-medium bg-orange-50 text-orange-700">
+      {/* Pipeline stage pills */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {['Vision', 'Context', 'Design Doc', 'Terraform'].map((step, i) => (
+          <div key={step} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{
+              padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 500,
+              backgroundColor: '#EEEDFE', color: '#5B4EE8',
+            }}>
               {step}
             </span>
-            {i < 3 && (
-              <div className="w-4 h-px bg-gray-300" />
-            )}
+            {i < 3 && <div style={{ width: '16px', height: '1px', backgroundColor: '#D1D5DB' }} />}
           </div>
         ))}
       </div>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 };

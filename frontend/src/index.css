@@ -1,27 +1,38 @@
+/* ══════════════════════════════════════════════════════════════
+   frontend/src/index.css  —  GLOBAL STYLES & DESIGN SYSTEM
+   ══════════════════════════════════════════════════════════════
+   🟢 BEGINNER: This file defines the visual look of the entire app.
+   It uses CSS custom properties (variables) for colors so we can
+   change the theme in one place. Tailwind directives at the top
+   include Tailwind's base reset, components, and utility classes.
+   ══════════════════════════════════════════════════════════════ */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* 🟢 BEGINNER: CSS custom properties = variables that can be reused everywhere.
+   Changing --accent here changes the purple accent color across the whole app. */
 :root {
   /* Design System Colors */
-  --page-bg: #F5F3EE;
-  --card-bg: #FFFFFF;
-  --accent: #5B4EE8;
-  --accent-hover: #4A3ED4;
-  --accent-light: #EEEDFE;
-  --accent-text: #534AB7;
-  --text-primary: #1a1a1a;
-  --text-secondary: #6b6b6b;
-  --text-tertiary: #9b9b9b;
-  --border: rgba(0,0,0,0.12);
-  --border-hover: rgba(0,0,0,0.28);
-  
+  --page-bg: #F5F3EE;          /* 🟢 BEGINNER: Warm off-white background for the entire page */
+  --card-bg: #FFFFFF;            /* 🟢 BEGINNER: Pure white for cards and panels */
+  --accent: #5B4EE8;           /* 🟢 BEGINNER: Purple accent color for buttons, links, highlights */
+  --accent-hover: #4A3ED4;     /* 🟢 BEGINNER: Darker purple for hover states */
+  --accent-light: #EEEDFE;     /* 🟢 BEGINNER: Very light purple for subtle backgrounds */
+  --accent-text: #534AB7;      /* 🟢 BEGINNER: Muted purple for text labels */
+  --text-primary: #1a1a1a;     /* 🟢 BEGINNER: Almost black for main text */
+  --text-secondary: #6b6b6b;   /* 🟢 BEGINNER: Gray for secondary text */
+  --text-tertiary: #9b9b9b;    /* 🟢 BEGINNER: Light gray for hints and placeholders */
+  --border: rgba(0,0,0,0.12);  /* 🟢 BEGINNER: Subtle border color */
+  --border-hover: rgba(0,0,0,0.28); /* 🟢 BEGINNER: Darker border on hover */
+
   /* Typography */
   --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
 }
 
 html {
-  scroll-behavior: smooth;
+  scroll-behavior: smooth;  /* 🟢 BEGINNER: Smooth scrolling when clicking anchor links */
 }
 
 body {
@@ -29,9 +40,15 @@ body {
   font-family: var(--font-sans);
   background-color: var(--page-bg);
   color: var(--text-primary);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: antialiased;    /* 🟢 BEGINNER: Makes text look sharper on macOS */
+  -moz-osx-font-smoothing: grayscale;    /* 🟢 BEGINNER: Makes text look sharper on macOS Firefox */
 }
+
+/* ══════════════════════════════════════════════════════════════
+   ANIMATIONS
+   ══════════════════════════════════════════════════════════════ */
+/* 🟢 BEGINNER: @keyframes define animations that can be reused with class names.
+   fadeIn makes elements appear smoothly from slightly below. */
 
 /* ── Fade In ── */
 @keyframes fadeIn {
@@ -123,6 +140,7 @@ body {
 }
 
 /* ── Custom scrollbar ── */
+/* 🟢 BEGINNER: Styles the browser's scrollbars to be thin and subtle, matching the app's clean design. */
 ::-webkit-scrollbar {
   width: 6px;
 }
@@ -138,6 +156,7 @@ body {
 }
 
 /* ── Focus ring smooth ── */
+/* 🟢 BEGINNER: When a user tabs to a button or link, show a purple-and-white ring instead of the browser default. */
 *:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px #fff, 0 0 0 4px #5B4EE8;
@@ -145,6 +164,7 @@ body {
 }
 
 /* ── Design System Utilities ── */
+/* 🟢 BEGINNER: Helper classes that components can use to apply the CSS variables defined in :root above. */
 .ds-page-bg {
   background-color: var(--page-bg);
 }
@@ -663,7 +683,8 @@ body {
 .md-table-wrapper {
   margin: 16px 0;
   border-radius: 12px;
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid #E5E7EB;
   box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
@@ -854,4 +875,27 @@ body {
   .md-h2 { font-size: 17px; }
   .md-table { font-size: 12px; }
   .md-table th, .md-table td { padding: 8px 10px; }
+}
+
+
+/* ── RAG Chat typing indicator ── */
+.rag-typing-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 2px;
+}
+.rag-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #5B4EE8;
+  animation: ragBounce 1.4s ease-in-out infinite;
+}
+.rag-dot:nth-child(1) { animation-delay: 0s; }
+.rag-dot:nth-child(2) { animation-delay: 0.2s; }
+.rag-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes ragBounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-6px); opacity: 1; }
 }

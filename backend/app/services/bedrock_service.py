@@ -30,45 +30,53 @@ SECURITY:
 ================================================================================
 """
 
+# 🟢 BEGINNER: boto3 is the official AWS SDK for Python. It lets us call AWS services like Bedrock.
 import boto3
 import json
+import logging
 import asyncio
 from typing import Dict, List, Any, AsyncGenerator
 from app.core.config import settings
 
+logger = logging.getLogger(__name__)
 
+
+# 🟢 BEGINNER: LEGACY class — this was the original way to call Claude on Bedrock.
+# The newer code in design_doc_service.py and terraform_chat.py has replaced most of its usage,
+# but it's kept here for backward compatibility.
 class BedrockService:
     """AWS Bedrock service for Claude/Sonnet integration"""
-    
+
     def __init__(self):
+        # 🟢 BEGINNER: Read AWS credentials and region from our centralized config (.env file).
         self.region = settings.AWS_DEFAULT_REGION
-        self.client = boto3.client(
-            'bedrock-runtime',
-            region_name=self.region,
-            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
-        )
+        # 🟢 BEGINNER: Use the shared Bedrock client factory so timeouts and retry
+        # behavior are consistent across the whole app (no more 9-minute hangs
+        # from boto3's silent retries).
+        from app.core.bedrock_client import get_bedrock_client
+        self.client = get_bedrock_client()
+        # 🟢 BEGINNER: The specific Claude model ID to use (e.g., us.anthropic.claude-sonnet-4-5-20250929-v1:0).
         self.model_id = settings.AWS_BEDROCK_MODEL
-    
+
     async def generate_design_document_stream(
         self,
         context_pack: Dict,
         enriched_context: Dict
     ) -> AsyncGenerator[str, None]:
         """Generate design document using Claude via AWS Bedrock with streaming"""
-        
-        # Build the prompt
+
+        # 🟢 BEGINNER: Build the giant text prompt that tells Claude what to write.
         prompt = self._build_design_document_prompt(context_pack, enriched_context)
-        
+
         try:
-            # Call Bedrock with streaming
+            # 🟢 BEGINNER: Call Bedrock in streaming mode. The response comes back as a series of "chunks" (text pieces).
             response = self.client.invoke_model_with_response_stream(
                 modelId=self.model_id,
                 contentType="application/json",
                 accept="application/json",
                 body=json.dumps({
                     "anthropic_version": "bedrock-2023-05-31",
-                    "max_tokens": 8000,
+                    "max_tokens": 8000,         # 🟢 BEGINNER: Maximum response length (8000 tokens ≈ 6000 words).
                     "messages": [
                         {
                             "role": "user",
@@ -77,8 +85,8 @@ class BedrockService:
                     ]
                 })
             )
-            
-            # Stream the response
+
+            # 🟢 BEGINNER: Loop over each chunk in the stream, parse the JSON inside it, and yield the text.
             stream = response['body']
             for event in stream:
                 chunk = event.get('chunk')
@@ -86,7 +94,7 @@ class BedrockService:
                     chunk_data = json.loads(chunk.get('bytes').decode())
                     if 'delta' in chunk_data and 'text' in chunk_data['delta']:
                         yield chunk_data['delta']['text']
-                        
+
         except Exception as e:
             yield f"\n\n[Error]: {str(e)}"
 
@@ -95,13 +103,13 @@ class BedrockService:
         context_pack: Dict,
         enriched_context: Dict
     ) -> Dict:
-        """Generate design document using Claude via AWS Bedrock"""
-        
-        # Build the prompt
+        """Generate design document using Claude via AWS Bedrock (non-streaming)"""
+
+        # 🟢 BEGINNER: Build the prompt text that describes the architecture to Claude.
         prompt = self._build_design_document_prompt(context_pack, enriched_context)
-        
+
         try:
-            # Call Bedrock
+            # 🟢 BEGINNER: Call Bedrock in non-streaming mode — waits for the entire response before returning.
             response = self.client.invoke_model(
                 modelId=self.model_id,
                 contentType="application/json",
@@ -117,27 +125,27 @@ class BedrockService:
                     ]
                 })
             )
-            
-            # Parse response
+
+            # 🟢 BEGINNER: Parse the JSON response body and extract the generated text.
             response_body = json.loads(response['body'].read())
             design_text = response_body['content'][0]['text']
-            
-            # Parse design document
+
+            # 🟢 BEGINNER: Try to extract structured JSON from the text (Claude sometimes wraps JSON in markdown).
             design_doc = self._parse_design_document(design_text)
-            
+
             return {
                 "success": True,
                 "design_document": design_doc,
                 "raw_response": design_text
             }
-            
+
         except Exception as e:
             return {
                 "success": False,
                 "error": str(e),
                 "design_document": None
             }
-    
+
     def _build_design_document_prompt(
         self,
         context_pack: Dict,
@@ -273,7 +281,7 @@ Ensure the design document:
             # Extract JSON from response
             import re
             json_match = re.search(r'\{[\s\S]*\}', design_text)
-            
+
             if json_match:
                 json_str = json_match.group()
                 design_doc = json.loads(json_str)
@@ -284,10 +292,74 @@ Ensure the design document:
                     "raw_text": design_text,
                     "error": "Could not extract JSON from response"
                 }
-                
+
         except Exception as e:
             return {
                 "error": f"Failed to parse design document: {str(e)}",
                 "raw_text": design_text
             }
-    
+
+    def invoke(self, messages: List[Dict[str, str]], max_tokens: int = 4000) -> str:
+        """Simple non-streaming invoke for agent nodes. Returns raw text response.
+        Routes through LLM Gateway for caching, circuit breaking, and cost tracking."""
+        from app.core.llm_gateway import get_gateway
+        return get_gateway().call(
+            messages=messages,
+            task_type="prompt_analysis",
+            max_tokens=max_tokens,
+        )
+
+    def check_credentials(self) -> dict:
+        """Verify AWS credentials and Bedrock model access by sending a minimal test invoke."""
+        import boto3
+        from botocore.exceptions import ClientError, NoCredentialsError
+
+        result = {
+            "aws_access_key_present": bool(settings.AWS_ACCESS_KEY_ID and settings.AWS_SECRET_ACCESS_KEY),
+            "region": self.region,
+            "model_id": self.model_id,
+            "bedrock_accessible": False,
+            "model_accessible": False,
+            "error": None,
+        }
+
+        try:
+            # Test 1: List foundation models (requires bedrock:ListFoundationModels)
+            # Short timeout — this is a health check, not a user-facing call.
+            from botocore.config import Config as _BotoConfig
+            bedrock_client = boto3.client(
+                'bedrock',
+                region_name=self.region,
+                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+                config=_BotoConfig(connect_timeout=5, read_timeout=15, retries={'max_attempts': 0, 'mode': 'standard'}),
+            )
+            models = bedrock_client.list_foundation_models()
+            result["bedrock_accessible"] = True
+            available_models = [m['modelId'] for m in models.get('modelSummaries', [])]
+            result["models_found"] = len(available_models)
+            result["model_accessible"] = self.model_id in available_models or any(self.model_id in m for m in available_models)
+
+            # Test 2: Minimal invoke to verify runtime access
+            test_response = self.invoke(
+                messages=[{"role": "user", "content": "Say 'AWS credentials OK' and nothing else."}],
+                max_tokens=20
+            )
+            result["invoke_test_response"] = test_response.strip()
+            result["invoke_test_passed"] = "OK" in test_response or "ok" in test_response.lower()
+
+            logger.info(f"[BedrockService] Credential check: bedrock_accessible={result['bedrock_accessible']}, model_accessible={result['model_accessible']}, invoke_passed={result.get('invoke_test_passed', False)}")
+
+        except NoCredentialsError as e:
+            result["error"] = f"AWS credentials not found: {e}"
+            logger.error(f"[BedrockService] Credential check FAILED: No AWS credentials")
+        except ClientError as e:
+            error_code = e.response.get('Error', {}).get('Code', 'Unknown')
+            result["error"] = f"AWS ClientError ({error_code}): {e}"
+            logger.error(f"[BedrockService] Credential check FAILED: {error_code} - {e}")
+        except Exception as e:
+            result["error"] = f"Unexpected error: {e}"
+            logger.error(f"[BedrockService] Credential check FAILED: {e}")
+
+        return result
+
