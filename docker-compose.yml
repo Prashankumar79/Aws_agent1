@@ -47,7 +47,7 @@ services:
     container_name: infrasketch-frontend
     restart: unless-stopped
     environment:
-      - API_KEY=${API_KEY:?Set API_KEY in the shell or .env before starting production compose}
+      - API_KEY=${API_KEY}
     ports:
       - "80:80"
     depends_on:
