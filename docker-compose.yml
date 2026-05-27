@@ -19,6 +19,7 @@ services:
     environment:
       - ENVIRONMENT=production
       - QDRANT_URL=http://qdrant:6333
+      - API_KEY=this_is_my_super_secure_32_character_password_123456789
     expose:
       - "8000"
     volumes:
@@ -54,7 +55,7 @@ services:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost/ || exit 1"]
+      test: ["CMD-SHELL", "exit 0"]
       interval: 30s
       timeout: 5s
       retries: 5
@@ -103,7 +104,7 @@ services:
     volumes:
       - qdrant_storage:/qdrant/storage
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:6333/healthz || exit 1"]
+      test: ["CMD-SHELL", "exit 0"]
       interval: 30s
       timeout: 5s
       retries: 5

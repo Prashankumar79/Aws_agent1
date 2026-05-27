@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useWorkflowStore } from '../store/workflowStore';
 import { api } from '../services/api';
 
-const DEFAULT_DRAWIO_URL = 'http://localhost:8081';
+const DEFAULT_DRAWIO_URL = window.location.origin + '/drawio/';
 const DRAWIO_LIBRARIES = [
   'general',
   'uml',
