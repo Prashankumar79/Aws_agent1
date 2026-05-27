@@ -78,12 +78,19 @@ async def lifespan(app: FastAPI):
     try:
         from app.services.bedrock_service import BedrockService
         bedrock = BedrockService()
-        cred_check = bedrock.check_credentials()
-        logger.info(f"[AWS Bedrock] Credential check: {json.dumps(cred_check, default=str)}")
-        if not cred_check.get("invoke_test_passed"):
-            logger.warning("[AWS Bedrock] Bedrock invoke test failed. Multi-agent pipeline may not work.")
+        # Run credential check in background so API starts serving immediately
+        import asyncio as _asyncio
+        async def _bg_check():
+            try:
+                cred_check = await _asyncio.to_thread(bedrock.check_credentials)
+                logger.info(f"[AWS Bedrock] Credential check: {json.dumps(cred_check, default=str)}")
+                if not cred_check.get("invoke_test_passed"):
+                    logger.warning("[AWS Bedrock] Bedrock invoke test failed.")
+            except Exception as bg_err:
+                logger.warning(f"[AWS Bedrock] Background credential check failed: {bg_err}")
+        _asyncio.create_task(_bg_check())
     except Exception as e:
-        logger.warning(f"[AWS Bedrock] Could not verify credentials: {e}. Multi-agent pipeline may fail.")
+        logger.warning(f"[AWS Bedrock] Could not initialize: {e}")
 
     # ðŸŸ¢ BEGINNER: Gemini key isn't strictly required to start â€” just warn if it's missing.
     if not settings.GEMINI_API_KEY:

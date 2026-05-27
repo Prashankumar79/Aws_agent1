@@ -48,7 +48,7 @@ services:
     container_name: infrasketch-frontend
     restart: unless-stopped
     environment:
-      - API_KEY=this_is_my_super_secure_32_character_password_123456789
+      - API_KEY=${API_KEY}
     ports:
       - "80:80"
     depends_on:
