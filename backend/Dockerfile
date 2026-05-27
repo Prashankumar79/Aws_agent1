@@ -18,7 +18,7 @@ COPY app ./app
 COPY run.py ./run.py
 
 RUN useradd --create-home --shell /usr/sbin/nologin appuser \
-    && mkdir -p /app/logs /app/storage/uploads /app/storage/processed /app/storage/outputs \
+    && mkdir -p /app/logs /app/storage/uploads /app/storage/processed /app/storage/outputs /app/data \
     && chown -R appuser:appuser /app
 
 USER appuser
